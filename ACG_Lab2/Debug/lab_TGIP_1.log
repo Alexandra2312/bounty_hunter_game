@@ -1,0 +1,11 @@
+﻿          1 file(s) copied.
+          1 file(s) copied.
+  main.cpp
+C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\main.cpp(274,25): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\main.cpp(306,29): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\main.cpp(312,31): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\main.cpp(341,22): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\main.cpp(341,48): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\main.cpp(361,22): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\main.cpp(362,22): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+  lab_TGIP_1.vcxproj -> C:\Users\alexa\OneDrive\Desktop\Bounty_Hunter_Project\Debug\ACG_Lab2.exe
