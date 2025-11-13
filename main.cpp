@@ -40,6 +40,7 @@ const double AMMO_BAR_DURATION = 2.0; // Show for 2 seconds
 // --- Lives System ---
 int playerLives = 3;
 bool gameOver = false;
+bool aiDefeated = false;
 
 // --- AI Lives System ---
 int aiLives = 3;
@@ -916,6 +917,52 @@ int main(void) {
             }
         }
 
+        // --- Victory Message when AI is defeated ---
+
+        if (aiDead) {
+            std::vector<GLfloat> victoryVerts;
+            float msgWidth = 1.0f;
+            float msgHeight = 0.25f;
+            float msgX = -msgWidth / 2.0f;
+            float msgY = 0.2f;
+
+            // Game Won box with border (green theme)
+            addQuad(victoryVerts, msgX - 0.02f, msgY - 0.02f,
+                msgX + msgWidth + 0.02f, msgY + msgHeight + 0.0f,
+                0.0f, 0.2f, 0.0f); // dark green border
+
+            addQuad(victoryVerts, msgX, msgY,
+                msgX + msgWidth, msgY + msgHeight,
+                0.0f, 0.6f, 0.0f); // medium green background
+
+            addQuad(victoryVerts, msgX + 0.01f, msgY + 0.01f,
+                msgX + msgWidth - 0.01f, msgY + msgHeight - 0.01f,
+                0.0f, 0.8f, 0.0f); // brighter green inner glow
+
+
+            // Draw "GAME WON" text
+            drawText(victoryVerts, msgX + 0.15f, msgY + 0.15f, "CONGRATULATIONS", 0.08f, 1.0f, 1.0f, 1.0f);
+            drawText(victoryVerts, msgX + 0.22f, msgY + 0.05f, "YOU WON", 0.06f, 1.0f, 1.0f, 0.6f);
+
+
+            GLuint victoryVAO, victoryVBO;
+            glGenVertexArrays(1, &victoryVAO);
+            glBindVertexArray(victoryVAO);
+            glGenBuffers(1, &victoryVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, victoryVBO);
+            glBufferData(GL_ARRAY_BUFFER, victoryVerts.size() * sizeof(GLfloat),
+                victoryVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                6 * sizeof(GLfloat), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+                6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+            glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, victoryVerts.size() / 6);
+            glDeleteBuffers(1, &victoryVBO);
+            glDeleteVertexArrays(1, &victoryVAO);
+        }
+
         // --- Game Over Message ---
         if (gameOver) {
             std::vector<GLfloat> gameOverVerts;
@@ -945,9 +992,12 @@ int main(void) {
             glDeleteBuffers(1, &gameOverVBO); glDeleteVertexArrays(1, &gameOverVAO);
         }
 
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
+
+    
 
     glDeleteBuffers(1, &VBO);
     glDeleteVertexArrays(1, &VAO);
