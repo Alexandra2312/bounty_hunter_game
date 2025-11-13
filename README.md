@@ -2,6 +2,10 @@
 
 A small OpenGL cowboy duel built with GLFW, GLEW and custom shaders. Ride your horse, dodge bullets, and take down the rival gunslinger outside the desert saloon.
 
+## Origin Story
+
+In the sun-scorched heart of the Wild West, she rides alone—known by no name, feared by every outlaw. A bounty hunter with a reputation as sharp as her six-shooter, she tracks the lawless across dusty plains and shadowed canyons. Every wanted poster is a challenge, every trail a puzzle, and every showdown a test of skill and nerve. With a steady hand, a keen eye, and a relentless drive for justice (or revenge), she turns the lawless frontier into her own hunting ground. In her world, mercy is rare, but reputation is everything—and hers precedes her like the wind through tumbleweeds.
+
 ## Features
 
 - Hand-crafted 2D scene with animated tumbleweed, day/night toggle, and full saloon facade.
