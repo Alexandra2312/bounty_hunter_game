@@ -432,6 +432,28 @@ int main(void) {
                 isJumping = false;
         }
 
+        // Player’s torso anchor matches drawCowboy()
+        float playerBaseX = cowboyX;
+        float playerBaseY = cowboyY + jumpY - 0.2f;
+
+        // Treat the saloon as a rectangle with a small buffer for easy triggering
+        bool nearSaloon =
+            playerBaseX >= saloonLeft - 0.1f && playerBaseX <= saloonRight + 0.1f &&
+            playerBaseY >= saloonBottom - 0.05f && playerBaseY <= saloonTop + 0.05f;
+
+        static bool reloadHeld = false;  // prevents holding R from spamming reloads
+        int reloadKeyState = glfwGetKey(window, GLFW_KEY_R);
+
+        if (!gameOver && nearSaloon && reloadKeyState == GLFW_PRESS && !reloadHeld) {
+            bulletCount = 8;
+            showAmmoBar = true;
+            ammoBarShowTime = currentTime;
+            reloadHeld = true;
+        }
+        if (reloadKeyState == GLFW_RELEASE) {
+            reloadHeld = false;
+        }
+
         // Update bullets
         for (auto& b : bullets) b.x += b.speed * deltaTime;
 
