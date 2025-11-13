@@ -29,6 +29,7 @@ bool isNight = false;
 float cowboyX = 0.0f, cowboyY = 0.0f;
 bool isJumping = false;
 float jumpStartTime = 0.0f;
+bool playerFacingRight = true; // NEW: player's facing direction
 
 // --- Gun/Ammo System ---
 int bulletCount = 8;
@@ -40,7 +41,7 @@ const double AMMO_BAR_DURATION = 2.0; // Show for 2 seconds
 int playerLives = 3;
 bool gameOver = false;
 
-// --- AI Lives System (new) ---
+// --- AI Lives System ---
 int aiLives = 3;
 bool aiDead = false;
 
@@ -86,7 +87,10 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
             // Only shoot if we have bullets
             if (bulletCount > 0) {
-                bullets.push_back({ cowboyX + 0.15f, cowboyY - 0.05f, 0.8f, false }); // false = player bullet
+                // spawn player bullet from gun barrel depending on facing
+                float bx = cowboyX + (playerFacingRight ? 0.15f : -0.13f);
+                float speed = (playerFacingRight ? 0.8f : -0.8f);
+                bullets.push_back({ bx, cowboyY - 0.05f, speed, false }); // false = player bullet
                 bulletCount--;
                 // Activate muzzle flash
                 muzzleFlashActive = true;
@@ -107,32 +111,36 @@ void addQuad(std::vector<GLfloat>& v, float x1, float y1, float x2, float y2, fl
         });
 }
 
-void drawCowboy(std::vector<GLfloat>& verts, float baseX, float baseY, float hatBobOffset = 0.0f) {
-    // Horse body
-    addQuad(verts, baseX - 0.2f, baseY - 0.1f, baseX + 0.2f, baseY + 0.1f, 0.4f, 0.2f, 0.0f);
+// drawCowboy now accepts facingRight to mirror horizontally
+void drawCowboy(std::vector<GLfloat>& verts, float baseX, float baseY, float hatBobOffset = 0.0f, bool facingRight = true) {
+    float dir = facingRight ? 1.0f : -1.0f;
+    auto ox = [&](float offset)->float { return baseX + offset * dir; };
+
+    // Horse body (symmetric)
+    addQuad(verts, ox(-0.2f), baseY - 0.1f, ox(0.2f), baseY + 0.1f, 0.4f, 0.2f, 0.0f);
     // Horse legs
-    addQuad(verts, baseX - 0.18f, baseY - 0.1f, baseX - 0.15f, baseY - 0.25f, 0.35f, 0.2f, 0.0f);
-    addQuad(verts, baseX + 0.15f, baseY - 0.1f, baseX + 0.18f, baseY - 0.25f, 0.35f, 0.2f, 0.0f);
-    // Horse head
+    addQuad(verts, ox(-0.18f), baseY - 0.1f, ox(-0.15f), baseY - 0.25f, 0.35f, 0.2f, 0.0f);
+    addQuad(verts, ox(0.15f), baseY - 0.1f, ox(0.18f), baseY - 0.25f, 0.35f, 0.2f, 0.0f);
+    // Horse head (mirror automatically via ox)
     verts.insert(verts.end(), {
-        baseX + 0.2f,baseY + 0.1f,0.0f,0.4f,0.2f,0.0f,
-        baseX + 0.3f,baseY + 0.1f,0.0f,0.4f,0.2f,0.0f,
-        baseX + 0.3f,baseY + 0.2f,0.0f,0.4f,0.2f,0.0f
+        ox(0.2f),baseY + 0.1f,0.0f,0.4f,0.2f,0.0f,
+        ox(0.3f),baseY + 0.1f,0.0f,0.4f,0.2f,0.0f,
+        ox(0.3f),baseY + 0.2f,0.0f,0.4f,0.2f,0.0f
         });
     // Cowboy body
-    addQuad(verts, baseX - 0.04f, baseY + 0.1f, baseX + 0.04f, baseY + 0.22f, 0.1f, 0.1f, 0.1f);
+    addQuad(verts, ox(-0.04f), baseY + 0.1f, ox(0.04f), baseY + 0.22f, 0.1f, 0.1f, 0.1f);
     // Cowboy head
-    addQuad(verts, baseX - 0.03f, baseY + 0.22f, baseX + 0.03f, baseY + 0.28f, 0.9f, 0.8f, 0.6f);
+    addQuad(verts, ox(-0.03f), baseY + 0.22f, ox(0.03f), baseY + 0.28f, 0.9f, 0.8f, 0.6f);
     // Cowboy hat (with bobbing offset applied)
     float hatY1 = baseY + 0.28f + hatBobOffset;
     float hatY2 = baseY + 0.32f + hatBobOffset;
     verts.insert(verts.end(), {
-        baseX - 0.05f,hatY1,0.0f,0.3f,0.1f,0.0f,
-        baseX + 0.05f,hatY1,0.0f,0.3f,0.1f,0.0f,
-        baseX,hatY2,0.0f,0.3f,0.1f,0.0f
+        ox(-0.05f),hatY1,0.0f,0.3f,0.1f,0.0f,
+        ox(0.05f),hatY1,0.0f,0.3f,0.1f,0.0f,
+        ox(0.0f),hatY2,0.0f,0.3f,0.1f,0.0f
         });
-    // Cowboy gun
-    addQuad(verts, baseX + 0.04f, baseY + 0.14f, baseX + 0.11f, baseY + 0.18f, 0.2f, 0.15f, 0.1f);
+    // Cowboy gun: place to the right if facingRight, left when not (mirrored by ox)
+    addQuad(verts, ox(0.04f), baseY + 0.14f, ox(0.11f), baseY + 0.18f, 0.2f, 0.15f, 0.1f);
 }
 
 void drawCharacter(std::vector<GLfloat>& verts, float x, float y, char c, float size, float r, float g, float b) {
@@ -281,6 +289,60 @@ int main(void) {
     addQuad(sceneVerts, -0.75f, -0.5f, -0.7f, -0.1f, 0.0f, 0.8f, 0.0f);
     addQuad(sceneVerts, 0.6f, -0.5f, 0.65f, -0.15f, 0.0f, 0.9f, 0.0f);
 
+    // cacti
+    addQuad(sceneVerts, -0.75f, -0.5f, -0.7f, -0.1f, 0.0f, 0.8f, 0.0f);
+    addQuad(sceneVerts, 0.6f, -0.5f, 0.65f, -0.15f, 0.0f, 0.9f, 0.0f);
+
+    // === SALOON BUILDING ===
+    float saloonLeft = -0.2f;
+    float saloonRight = 0.4f;
+    float saloonBottom = -0.5f;
+    float saloonTop = 0.2f;
+
+    // Main building body (wooden brown)
+    addQuad(sceneVerts, saloonLeft, saloonBottom, saloonRight, saloonTop, 0.55f, 0.27f, 0.07f);
+
+    // Roof (darker brown)
+    addQuad(sceneVerts, saloonLeft - 0.05f, saloonTop, saloonRight + 0.05f, saloonTop + 0.05f, 0.35f, 0.16f, 0.05f);
+
+    // Door
+    addQuad(sceneVerts, 0.05f, saloonBottom, 0.15f, -0.2f, 0.25f, 0.13f, 0.03f);
+
+    // Windows (light yellow, as if lights are inside)
+    addQuad(sceneVerts, saloonLeft + 0.05f, -0.1f, saloonLeft + 0.15f, 0.05f, 0.9f, 0.8f, 0.5f);
+    addQuad(sceneVerts, saloonRight - 0.15f, -0.1f, saloonRight - 0.05f, 0.05f, 0.9f, 0.8f, 0.5f);
+
+    // Balcony/Sign base
+    addQuad(sceneVerts, saloonLeft + 0.05f, 0.15f, saloonRight - 0.05f, 0.2f, 0.4f, 0.2f, 0.05f);
+
+    // “SALOON” text sign (big letters)
+    drawText(sceneVerts, saloonLeft + 0.1f, 0.18f, "SALOON", 0.05f, 0.9f, 0.9f, 0.2f);
+
+    // === PORCH ADDITION ===
+    float porchDepth = 0.05f;
+    float porchTop = saloonBottom + 0.05f;
+    float porchFront = saloonBottom - porchDepth;
+
+    // Porch deck (lighter wood)
+    addQuad(sceneVerts, saloonLeft - 0.05f, porchFront, saloonRight + 0.05f, porchTop, 0.65f, 0.43f, 0.20f);
+
+    // Support columns
+    float columnWidth = 0.03f;
+    float columnTop = saloonTop;
+    float columnBottom = porchTop;
+
+    // Left column
+    addQuad(sceneVerts, saloonLeft + 0.05f, columnBottom, saloonLeft + 0.05f + columnWidth, columnTop, 0.45f, 0.25f, 0.08f);
+
+    // Right column
+    addQuad(sceneVerts, saloonRight - 0.05f - columnWidth, columnBottom, saloonRight - 0.05f, columnTop, 0.45f, 0.25f, 0.08f);
+
+    // Optional: porch shadow
+    addQuad(sceneVerts, saloonLeft - 0.05f, porchFront - 0.02f, saloonRight + 0.05f, porchFront, 0.25f, 0.20f, 0.10f);
+
+    // === END SALOON ===
+
+
     GLuint VAO, VBO;
     glGenVertexArrays(1, &VAO);
     glBindVertexArray(VAO);
@@ -319,14 +381,19 @@ int main(void) {
 
         // === Movement: WASD and Arrow keys (disabled when game over) ===
         if (!gameOver) {
+            // Player facing updates: pressing A makes him face left; D makes him face right.
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+                playerFacingRight = false; // flip to left when pressing A
+                cowboyX -= 0.4f * deltaTime;
+            }
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+                playerFacingRight = true; // face right when pressing D
+                cowboyX += 0.4f * deltaTime;
+            }
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
                 cowboyY += 0.4f * deltaTime;
             if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
                 cowboyY -= 0.4f * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-                cowboyX -= 0.4f * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-                cowboyX += 0.4f * deltaTime;
 
             // === Jumping ===
             if (!isJumping && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
@@ -362,7 +429,9 @@ int main(void) {
                     if (b.isAIBullet) {
                         // Bullet bounds
                         float bulletLeft = b.x;
-                        float bulletRight = b.x + 0.02f;
+                        float bulletRight = b.x + 0.02f * (b.speed >= 0 ? 1.0f : -1.0f);
+                        // normalize min/max
+                        if (bulletRight < bulletLeft) std::swap(bulletLeft, bulletRight);
                         float bulletBottom = b.y;
                         float bulletTop = b.y + 0.01f;
 
@@ -396,7 +465,8 @@ int main(void) {
                     if (!b.isAIBullet) {
                         // Player bullet bounds
                         float bulletLeft = b.x;
-                        float bulletRight = b.x + 0.02f;
+                        float bulletRight = b.x + 0.02f * (b.speed >= 0 ? 1.0f : -1.0f);
+                        if (bulletRight < bulletLeft) std::swap(bulletLeft, bulletRight);
                         float bulletBottom = b.y;
                         float bulletTop = b.y + 0.01f;
 
@@ -424,10 +494,11 @@ int main(void) {
         // === AI Cowboy Shooting (disabled when game over or AI dead) ===
         if (!gameOver && !aiDead && currentTime - aiCowboy.lastShotTime >= AI_SHOOT_INTERVAL) {
             // AI cowboy shoots (from gun barrel position)
-            float aiGunX = aiCowboy.x + 0.11f; // Gun barrel X position (right side of AI cowboy)
+            bool aiFacingRight = (aiCowboy.direction > 0.0f);
+            float aiGunX = aiCowboy.x + (aiFacingRight ? 0.11f : -0.11f); // Gun barrel X position depending on facing
             float aiGunY = aiCowboy.y + 0.15f; // Bullet Y position (matches player's relative offset)
-            // AI bullet moves right (towards player area)
-            bullets.push_back({ aiGunX, aiGunY, 0.8f, true }); // true = AI bullet
+            float aiBulletSpeed = (aiFacingRight ? 0.8f : -0.8f);
+            bullets.push_back({ aiGunX, aiGunY, aiBulletSpeed, true }); // true = AI bullet
             aiCowboy.lastShotTime = currentTime;
             // Activate AI muzzle flash
             aiCowboy.muzzleFlashActive = true;
@@ -514,7 +585,7 @@ int main(void) {
         std::vector<GLfloat> hcVerts;
         float baseX = cowboyX;
         float baseY = cowboyY + jumpY - 0.2f;
-        drawCowboy(hcVerts, baseX, baseY, playerHatBob);
+        drawCowboy(hcVerts, baseX, baseY, playerHatBob, playerFacingRight);
 
         GLuint hcVAO, hcVBO;
         glGenVertexArrays(1, &hcVAO);
@@ -527,24 +598,24 @@ int main(void) {
         glDrawArrays(GL_TRIANGLES, 0, hcVerts.size() / 6);
         glDeleteBuffers(1, &hcVBO); glDeleteVertexArrays(1, &hcVAO);
 
-        // --- Muzzle Flash ---
+        // --- Muzzle Flash (player) ---
         if (muzzleFlashActive) {
             float flashElapsed = (float)(currentTime - muzzleFlashStartTime);
             float flashAlpha = 1.0f - (flashElapsed / (float)MUZZLE_FLASH_DURATION); // Fade out
             flashAlpha = std::max(0.0f, std::min(1.0f, flashAlpha)); // Clamp between 0 and 1
 
-            // Gun barrel position (rightmost end of gun)
-            float gunBarrelX = baseX + 0.11f;
+            // Gun barrel position depends on facing
+            float gunBarrelX = baseX + (playerFacingRight ? 0.11f : -0.11f);
             float gunBarrelY = baseY + 0.16f; // Middle of gun vertically
 
             // Draw bright flash at gun barrel
             std::vector<GLfloat> flashVerts;
-            // Bright yellow-white flash that extends from barrel
+            // Bright yellow-white flash that extends from barrel in facing direction
             float flashHeight = 0.06f * flashAlpha; // Vertical size of flash
-            float flashWidth = 0.08f * flashAlpha; // Horizontal extension from barrel
+            float flashWidth = 0.08f * flashAlpha * (playerFacingRight ? 1.0f : -1.0f); // Horizontal extension from barrel with sign
             float flashBrightness = 1.0f * flashAlpha; // Brightness fades from full to zero
 
-            // Main flash (bright white-yellow)
+            // Main flash (bright white-yellow) - horizontal extent depends on sign
             addQuad(flashVerts,
                 gunBarrelX, gunBarrelY - flashHeight * 0.5f,
                 gunBarrelX + flashWidth, gunBarrelY + flashHeight * 0.5f,
@@ -575,8 +646,8 @@ int main(void) {
         std::vector<GLfloat> aiVerts;
         float aiBaseX = aiCowboy.x;
         float aiBaseY = aiCowboy.y;
-        // If AI is dead, we could optionally draw a fallen/dead sprite; for now it simply stops acting
-        drawCowboy(aiVerts, aiBaseX, aiBaseY, aiHatBob);
+        bool aiFacingRight = (aiCowboy.direction > 0.0f);
+        drawCowboy(aiVerts, aiBaseX, aiBaseY, aiHatBob, aiFacingRight);
 
         GLuint aiVAO, aiVBO;
         glGenVertexArrays(1, &aiVAO);
@@ -595,17 +666,17 @@ int main(void) {
             float flashAlpha = 1.0f - (flashElapsed / (float)MUZZLE_FLASH_DURATION); // Fade out
             flashAlpha = std::max(0.0f, std::min(1.0f, flashAlpha)); // Clamp between 0 and 1
 
-            // AI gun barrel position (rightmost end of gun, same as player)
-            float aiGunBarrelX = aiBaseX + 0.11f;
+            // AI gun barrel position depends on facing
+            float aiGunBarrelX = aiBaseX + (aiFacingRight ? 0.11f : -0.11f);
             float aiGunBarrelY = aiBaseY + 0.16f; // Middle of gun vertically
 
-            // Draw bright flash at gun barrel (extends to the right since AI shoots right toward player)
+            // Draw bright flash at gun barrel (extends in facing direction)
             std::vector<GLfloat> aiFlashVerts;
             float flashHeight = 0.06f * flashAlpha; // Vertical size of flash
-            float flashWidth = 0.08f * flashAlpha; // Horizontal extension from barrel
+            float flashWidth = 0.08f * flashAlpha * (aiFacingRight ? 1.0f : -1.0f); // signed
             float flashBrightness = 1.0f * flashAlpha; // Brightness fades from full to zero
 
-            // Main flash (bright white-yellow) - extends to the right
+            // Main flash (bright white-yellow)
             addQuad(aiFlashVerts,
                 aiGunBarrelX, aiGunBarrelY - flashHeight * 0.5f,
                 aiGunBarrelX + flashWidth, aiGunBarrelY + flashHeight * 0.5f,
@@ -682,7 +753,7 @@ int main(void) {
         glDrawArrays(GL_TRIANGLES, 0, livesVerts.size() / 6);
         glDeleteBuffers(1, &livesVBO); glDeleteVertexArrays(1, &livesVAO);
 
-        // --- AI Lives Display (Top-Right Corner) (NEW: green squares) ---
+        // --- AI Lives Display (Top-Right Corner) (green squares) ---
         std::vector<GLfloat> aiLivesVerts;
         float aiLivesStartX = 0.6f; // top-right area
         float aiLivesStartY = 0.85f;
