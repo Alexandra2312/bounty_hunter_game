@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h> 
 #include <stdlib.h>
 #include <iostream>
 #include <vector>
@@ -15,7 +15,7 @@
 GLFWwindow* window;
 const int WINDOW_WIDTH = 728, WINDOW_HEIGHT = 728;
 
-struct Bullet { float x, y, speed; };
+struct Bullet { float x, y, speed; bool isAIBullet; };
 std::vector<Bullet> bullets;
 
 struct Tumbleweed {
@@ -36,13 +36,31 @@ bool showAmmoBar = false;
 double ammoBarShowTime = 0.0;
 const double AMMO_BAR_DURATION = 2.0; // Show for 2 seconds
 
+// --- Lives System ---
+int playerLives = 3;
+bool gameOver = false;
+
+// --- AI Lives System (new) ---
+int aiLives = 3;
+bool aiDead = false;
+
+// --- Muzzle Flash ---
+bool muzzleFlashActive = false;
+double muzzleFlashStartTime = 0.0;
+const double MUZZLE_FLASH_DURATION = 0.15; // Flash for 0.15 seconds (a few frames)
+
 // --- Second Cowboy (AI) ---
 struct AICowboy {
     float x, y;
     float speed;
     float direction; // 1 = right, -1 = left
     float minX, maxX;
-} aiCowboy = { -0.5f, -0.35f, 0.3f, 1.0f, -0.8f, 0.8f };
+    double lastShotTime;
+    bool muzzleFlashActive;
+    double muzzleFlashStartTime;
+} aiCowboy = { -0.5f, -0.35f, 0.3f, 1.0f, -0.8f, 0.8f, 0.0, false, 0.0 };
+
+const double AI_SHOOT_INTERVAL = 3.0; // AI shoots every 3 seconds
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -61,15 +79,18 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
         if (xNDC < -0.4f && yNDC > 0.4f) {
             isNight = !isNight;
         }
-        else {
-            // Show ammo bar when attempting to shoot
+        else if (!gameOver) {
+            // Show ammo bar when attempting to shoot (only if game not over)
             showAmmoBar = true;
             ammoBarShowTime = glfwGetTime();
 
             // Only shoot if we have bullets
             if (bulletCount > 0) {
-                bullets.push_back({ cowboyX + 0.15f, cowboyY - 0.05f, 0.8f });
+                bullets.push_back({ cowboyX + 0.15f, cowboyY - 0.05f, 0.8f, false }); // false = player bullet
                 bulletCount--;
+                // Activate muzzle flash
+                muzzleFlashActive = true;
+                muzzleFlashStartTime = glfwGetTime();
             }
         }
     }
@@ -86,7 +107,7 @@ void addQuad(std::vector<GLfloat>& v, float x1, float y1, float x2, float y2, fl
         });
 }
 
-void drawCowboy(std::vector<GLfloat>& verts, float baseX, float baseY) {
+void drawCowboy(std::vector<GLfloat>& verts, float baseX, float baseY, float hatBobOffset = 0.0f) {
     // Horse body
     addQuad(verts, baseX - 0.2f, baseY - 0.1f, baseX + 0.2f, baseY + 0.1f, 0.4f, 0.2f, 0.0f);
     // Horse legs
@@ -102,12 +123,16 @@ void drawCowboy(std::vector<GLfloat>& verts, float baseX, float baseY) {
     addQuad(verts, baseX - 0.04f, baseY + 0.1f, baseX + 0.04f, baseY + 0.22f, 0.1f, 0.1f, 0.1f);
     // Cowboy head
     addQuad(verts, baseX - 0.03f, baseY + 0.22f, baseX + 0.03f, baseY + 0.28f, 0.9f, 0.8f, 0.6f);
-    // Cowboy hat
+    // Cowboy hat (with bobbing offset applied)
+    float hatY1 = baseY + 0.28f + hatBobOffset;
+    float hatY2 = baseY + 0.32f + hatBobOffset;
     verts.insert(verts.end(), {
-        baseX - 0.05f,baseY + 0.28f,0.0f,0.3f,0.1f,0.0f,
-        baseX + 0.05f,baseY + 0.28f,0.0f,0.3f,0.1f,0.0f,
-        baseX,baseY + 0.32f,0.0f,0.3f,0.1f,0.0f
+        baseX - 0.05f,hatY1,0.0f,0.3f,0.1f,0.0f,
+        baseX + 0.05f,hatY1,0.0f,0.3f,0.1f,0.0f,
+        baseX,hatY2,0.0f,0.3f,0.1f,0.0f
         });
+    // Cowboy gun
+    addQuad(verts, baseX + 0.04f, baseY + 0.14f, baseX + 0.11f, baseY + 0.18f, 0.2f, 0.15f, 0.1f);
 }
 
 void drawCharacter(std::vector<GLfloat>& verts, float x, float y, char c, float size, float r, float g, float b) {
@@ -279,31 +304,35 @@ int main(void) {
         if (tumbleweed.x - tumbleweed.radius > 1.2f) tumbleweed.x = -1.2f;
 
         // === AI Cowboy Movement ===
-        aiCowboy.x += aiCowboy.direction * aiCowboy.speed * deltaTime;
-        // Change direction when reaching boundaries
-        if (aiCowboy.x >= aiCowboy.maxX) {
-            aiCowboy.x = aiCowboy.maxX;
-            aiCowboy.direction = -1.0f;
-        }
-        else if (aiCowboy.x <= aiCowboy.minX) {
-            aiCowboy.x = aiCowboy.minX;
-            aiCowboy.direction = 1.0f;
+        if (!aiDead) {
+            aiCowboy.x += aiCowboy.direction * aiCowboy.speed * deltaTime;
+            // Change direction when reaching boundaries
+            if (aiCowboy.x >= aiCowboy.maxX) {
+                aiCowboy.x = aiCowboy.maxX;
+                aiCowboy.direction = -1.0f;
+            }
+            else if (aiCowboy.x <= aiCowboy.minX) {
+                aiCowboy.x = aiCowboy.minX;
+                aiCowboy.direction = 1.0f;
+            }
         }
 
-        // === Movement: WASD and Arrow keys ===
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-            cowboyY += 0.4f * deltaTime;
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-            cowboyY -= 0.4f * deltaTime;
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-            cowboyX -= 0.4f * deltaTime;
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-            cowboyX += 0.4f * deltaTime;
+        // === Movement: WASD and Arrow keys (disabled when game over) ===
+        if (!gameOver) {
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+                cowboyY += 0.4f * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+                cowboyY -= 0.4f * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+                cowboyX -= 0.4f * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+                cowboyX += 0.4f * deltaTime;
 
-        // === Jumping ===
-        if (!isJumping && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            isJumping = true;
-            jumpStartTime = currentTime;
+            // === Jumping ===
+            if (!isJumping && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                isJumping = true;
+                jumpStartTime = currentTime;
+            }
         }
         float jumpY = 0.0f;
         if (isJumping) {
@@ -314,12 +343,110 @@ int main(void) {
                 isJumping = false;
         }
 
+        // Update bullets
         for (auto& b : bullets) b.x += b.speed * deltaTime;
-        bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const Bullet& b) {return b.x > 1.2f;}), bullets.end());
+
+        // === Collision Detection: AI Bullets vs Player Cowboy Body ===
+        if (!gameOver && playerLives > 0) {
+            float playerBaseX = cowboyX;
+            float playerBaseY = cowboyY + jumpY - 0.2f;
+            // Player cowboy body bounds (from drawCowboy function)
+            float playerBodyLeft = playerBaseX - 0.04f;
+            float playerBodyRight = playerBaseX + 0.04f;
+            float playerBodyBottom = playerBaseY + 0.1f;
+            float playerBodyTop = playerBaseY + 0.22f;
+
+            // Check collision with AI bullets
+            bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+                [&](const Bullet& b) {
+                    if (b.isAIBullet) {
+                        // Bullet bounds
+                        float bulletLeft = b.x;
+                        float bulletRight = b.x + 0.02f;
+                        float bulletBottom = b.y;
+                        float bulletTop = b.y + 0.01f;
+
+                        // Check if bullet overlaps with player body
+                        if (bulletRight >= playerBodyLeft && bulletLeft <= playerBodyRight &&
+                            bulletTop >= playerBodyBottom && bulletBottom <= playerBodyTop) {
+                            // Collision! Player loses a life
+                            playerLives--;
+                            if (playerLives <= 0) {
+                                gameOver = true;
+                            }
+                            return true; // Remove bullet
+                        }
+                    }
+                    return false;
+                }), bullets.end());
+        }
+
+        // === Collision Detection: Player Bullets vs AI Cowboy Body (NEW) ===
+        if (!aiDead) {
+            float aiBaseX = aiCowboy.x;
+            float aiBaseY = aiCowboy.y;
+            // AI cowboy body bounds (same as drawCowboy)
+            float aiBodyLeft = aiBaseX - 0.04f;
+            float aiBodyRight = aiBaseX + 0.04f;
+            float aiBodyBottom = aiBaseY + 0.1f;
+            float aiBodyTop = aiBaseY + 0.22f;
+
+            bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+                [&](const Bullet& b) {
+                    if (!b.isAIBullet) {
+                        // Player bullet bounds
+                        float bulletLeft = b.x;
+                        float bulletRight = b.x + 0.02f;
+                        float bulletBottom = b.y;
+                        float bulletTop = b.y + 0.01f;
+
+                        // Check overlap with AI body
+                        if (bulletRight >= aiBodyLeft && bulletLeft <= aiBodyRight &&
+                            bulletTop >= aiBodyBottom && bulletBottom <= aiBodyTop) {
+                            // Collision! AI loses a life
+                            aiLives--;
+                            if (aiLives <= 0) {
+                                aiDead = true;
+                                // stop AI muzzle flash / shooting
+                                aiCowboy.muzzleFlashActive = false;
+                            }
+                            return true; // remove bullet
+                        }
+                    }
+                    return false;
+                }), bullets.end());
+        }
+
+        // Remove bullets that go off screen (left or right)
+        bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+            [](const Bullet& b) {return b.x > 1.2f || b.x < -1.2f; }), bullets.end());
+
+        // === AI Cowboy Shooting (disabled when game over or AI dead) ===
+        if (!gameOver && !aiDead && currentTime - aiCowboy.lastShotTime >= AI_SHOOT_INTERVAL) {
+            // AI cowboy shoots (from gun barrel position)
+            float aiGunX = aiCowboy.x + 0.11f; // Gun barrel X position (right side of AI cowboy)
+            float aiGunY = aiCowboy.y + 0.15f; // Bullet Y position (matches player's relative offset)
+            // AI bullet moves right (towards player area)
+            bullets.push_back({ aiGunX, aiGunY, 0.8f, true }); // true = AI bullet
+            aiCowboy.lastShotTime = currentTime;
+            // Activate AI muzzle flash
+            aiCowboy.muzzleFlashActive = true;
+            aiCowboy.muzzleFlashStartTime = currentTime;
+        }
+
+        // Update AI muzzle flash state
+        if (aiCowboy.muzzleFlashActive && (currentTime - aiCowboy.muzzleFlashStartTime) > MUZZLE_FLASH_DURATION) {
+            aiCowboy.muzzleFlashActive = false;
+        }
 
         // Hide ammo bar after duration
         if (showAmmoBar && (currentTime - ammoBarShowTime) > AMMO_BAR_DURATION) {
             showAmmoBar = false;
+        }
+
+        // Update muzzle flash state
+        if (muzzleFlashActive && (currentTime - muzzleFlashStartTime) > MUZZLE_FLASH_DURATION) {
+            muzzleFlashActive = false;
         }
 
         // --- Background ---
@@ -337,7 +464,7 @@ int main(void) {
         float sr = isNight ? 0.8f : 1.0f, sg = isNight ? 0.8f : 0.9f, sb = isNight ? 0.8f : 0.2f;
         std::vector<GLfloat> sunVerts;
         int segs = 30;
-        for (int i = 0;i < segs;i++) {
+        for (int i = 0; i < segs; i++) {
             float a1 = 2 * M_PI * i / segs, a2 = 2 * M_PI * (i + 1) / segs;
             sunVerts.insert(sunVerts.end(), {
                 sunX,sunY,0.0f,sr,sg,sb,
@@ -357,7 +484,7 @@ int main(void) {
         // --- Tumbleweed ---
         std::vector<GLfloat> tVerts;
         int segCount = 14;
-        for (int i = 0;i < segCount;i++) {
+        for (int i = 0; i < segCount; i++) {
             float a1 = 2 * M_PI * i / segCount;
             float a2 = 2 * M_PI * (i + 1) / segCount;
             tVerts.insert(tVerts.end(), {
@@ -377,11 +504,17 @@ int main(void) {
         glDrawArrays(GL_TRIANGLES, 0, tVerts.size() / 6);
         glDeleteBuffers(1, &tVBO); glDeleteVertexArrays(1, &tVAO);
 
+        // --- Hat Bobbing Animation ---
+        const float HAT_BOB_FREQUENCY = 2.0f; // Slow frequency for smooth bobbing
+        const float HAT_BOB_AMPLITUDE = 0.015f; // Small amplitude for subtle movement
+        float playerHatBob = sin((float)currentTime * HAT_BOB_FREQUENCY) * HAT_BOB_AMPLITUDE;
+        float aiHatBob = sin((float)currentTime * HAT_BOB_FREQUENCY + (float)M_PI / 2.0f) * HAT_BOB_AMPLITUDE; // 90 degrees out of phase
+
         // --- Player Cowboy + Horse ---
         std::vector<GLfloat> hcVerts;
         float baseX = cowboyX;
         float baseY = cowboyY + jumpY - 0.2f;
-        drawCowboy(hcVerts, baseX, baseY);
+        drawCowboy(hcVerts, baseX, baseY, playerHatBob);
 
         GLuint hcVAO, hcVBO;
         glGenVertexArrays(1, &hcVAO);
@@ -394,9 +527,56 @@ int main(void) {
         glDrawArrays(GL_TRIANGLES, 0, hcVerts.size() / 6);
         glDeleteBuffers(1, &hcVBO); glDeleteVertexArrays(1, &hcVAO);
 
+        // --- Muzzle Flash ---
+        if (muzzleFlashActive) {
+            float flashElapsed = (float)(currentTime - muzzleFlashStartTime);
+            float flashAlpha = 1.0f - (flashElapsed / (float)MUZZLE_FLASH_DURATION); // Fade out
+            flashAlpha = std::max(0.0f, std::min(1.0f, flashAlpha)); // Clamp between 0 and 1
+
+            // Gun barrel position (rightmost end of gun)
+            float gunBarrelX = baseX + 0.11f;
+            float gunBarrelY = baseY + 0.16f; // Middle of gun vertically
+
+            // Draw bright flash at gun barrel
+            std::vector<GLfloat> flashVerts;
+            // Bright yellow-white flash that extends from barrel
+            float flashHeight = 0.06f * flashAlpha; // Vertical size of flash
+            float flashWidth = 0.08f * flashAlpha; // Horizontal extension from barrel
+            float flashBrightness = 1.0f * flashAlpha; // Brightness fades from full to zero
+
+            // Main flash (bright white-yellow)
+            addQuad(flashVerts,
+                gunBarrelX, gunBarrelY - flashHeight * 0.5f,
+                gunBarrelX + flashWidth, gunBarrelY + flashHeight * 0.5f,
+                flashBrightness, flashBrightness * 0.95f, flashBrightness * 0.4f); // Bright yellow-white
+
+            // Secondary inner flash (brighter core) - only visible in first half of flash duration
+            if (flashAlpha > 0.5f) {
+                float coreAlpha = (flashAlpha - 0.5f) * 2.0f; // Scale from 0 to 1 over first half
+                addQuad(flashVerts,
+                    gunBarrelX, gunBarrelY - flashHeight * 0.3f * coreAlpha,
+                    gunBarrelX + flashWidth * 0.7f * coreAlpha, gunBarrelY + flashHeight * 0.3f * coreAlpha,
+                    1.0f, 1.0f, 0.85f); // Very bright white-yellow core
+            }
+
+            GLuint flashVAO, flashVBO;
+            glGenVertexArrays(1, &flashVAO);
+            glBindVertexArray(flashVAO);
+            glGenBuffers(1, &flashVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, flashVBO);
+            glBufferData(GL_ARRAY_BUFFER, flashVerts.size() * sizeof(GLfloat), flashVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, flashVerts.size() / 6);
+            glDeleteBuffers(1, &flashVBO); glDeleteVertexArrays(1, &flashVAO);
+        }
+
         // --- AI Cowboy + Horse ---
         std::vector<GLfloat> aiVerts;
-        drawCowboy(aiVerts, aiCowboy.x, aiCowboy.y);
+        float aiBaseX = aiCowboy.x;
+        float aiBaseY = aiCowboy.y;
+        // If AI is dead, we could optionally draw a fallen/dead sprite; for now it simply stops acting
+        drawCowboy(aiVerts, aiBaseX, aiBaseY, aiHatBob);
 
         GLuint aiVAO, aiVBO;
         glGenVertexArrays(1, &aiVAO);
@@ -408,6 +588,49 @@ int main(void) {
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
         glDrawArrays(GL_TRIANGLES, 0, aiVerts.size() / 6);
         glDeleteBuffers(1, &aiVBO); glDeleteVertexArrays(1, &aiVAO);
+
+        // --- AI Muzzle Flash ---
+        if (aiCowboy.muzzleFlashActive) {
+            float flashElapsed = (float)(currentTime - aiCowboy.muzzleFlashStartTime);
+            float flashAlpha = 1.0f - (flashElapsed / (float)MUZZLE_FLASH_DURATION); // Fade out
+            flashAlpha = std::max(0.0f, std::min(1.0f, flashAlpha)); // Clamp between 0 and 1
+
+            // AI gun barrel position (rightmost end of gun, same as player)
+            float aiGunBarrelX = aiBaseX + 0.11f;
+            float aiGunBarrelY = aiBaseY + 0.16f; // Middle of gun vertically
+
+            // Draw bright flash at gun barrel (extends to the right since AI shoots right toward player)
+            std::vector<GLfloat> aiFlashVerts;
+            float flashHeight = 0.06f * flashAlpha; // Vertical size of flash
+            float flashWidth = 0.08f * flashAlpha; // Horizontal extension from barrel
+            float flashBrightness = 1.0f * flashAlpha; // Brightness fades from full to zero
+
+            // Main flash (bright white-yellow) - extends to the right
+            addQuad(aiFlashVerts,
+                aiGunBarrelX, aiGunBarrelY - flashHeight * 0.5f,
+                aiGunBarrelX + flashWidth, aiGunBarrelY + flashHeight * 0.5f,
+                flashBrightness, flashBrightness * 0.95f, flashBrightness * 0.4f); // Bright yellow-white
+
+            // Secondary inner flash (brighter core) - only visible in first half of flash duration
+            if (flashAlpha > 0.5f) {
+                float coreAlpha = (flashAlpha - 0.5f) * 2.0f; // Scale from 0 to 1 over first half
+                addQuad(aiFlashVerts,
+                    aiGunBarrelX, aiGunBarrelY - flashHeight * 0.3f * coreAlpha,
+                    aiGunBarrelX + flashWidth * 0.7f * coreAlpha, aiGunBarrelY + flashHeight * 0.3f * coreAlpha,
+                    1.0f, 1.0f, 0.85f); // Very bright white-yellow core
+            }
+
+            GLuint aiFlashVAO, aiFlashVBO;
+            glGenVertexArrays(1, &aiFlashVAO);
+            glBindVertexArray(aiFlashVAO);
+            glGenBuffers(1, &aiFlashVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, aiFlashVBO);
+            glBufferData(GL_ARRAY_BUFFER, aiFlashVerts.size() * sizeof(GLfloat), aiFlashVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, aiFlashVerts.size() / 6);
+            glDeleteBuffers(1, &aiFlashVBO); glDeleteVertexArrays(1, &aiFlashVAO);
+        }
 
         // --- Bullets ---
         if (!bullets.empty()) {
@@ -425,6 +648,69 @@ int main(void) {
             glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
             glDrawArrays(GL_TRIANGLES, 0, bVerts.size() / 6);
             glDeleteBuffers(1, &bVBO); glDeleteVertexArrays(1, &bVAO);
+        }
+
+        // --- Lives Display (Top-Left Corner) (Player) ---
+        std::vector<GLfloat> livesVerts;
+        float livesStartX = -0.95f;
+        float livesStartY = 0.85f;
+        float lifeSquareSize = 0.05f;
+        float lifeSpacing = 0.06f;
+
+        for (int i = 0; i < 3; i++) {
+            float xPos = livesStartX + (i * lifeSpacing);
+            if (i < playerLives) {
+                // Full life (red square with border)
+                addQuad(livesVerts, xPos - 0.003f, livesStartY - 0.003f, xPos + lifeSquareSize + 0.003f, livesStartY + lifeSquareSize + 0.003f, 0.2f, 0.0f, 0.0f); // Border
+                addQuad(livesVerts, xPos, livesStartY, xPos + lifeSquareSize, livesStartY + lifeSquareSize, 1.0f, 0.0f, 0.0f); // Red square
+            }
+            else {
+                // Lost life (gray/empty square with border)
+                addQuad(livesVerts, xPos - 0.003f, livesStartY - 0.003f, xPos + lifeSquareSize + 0.003f, livesStartY + lifeSquareSize + 0.003f, 0.15f, 0.15f, 0.15f); // Border
+                addQuad(livesVerts, xPos, livesStartY, xPos + lifeSquareSize, livesStartY + lifeSquareSize, 0.25f, 0.25f, 0.25f); // Gray square
+            }
+        }
+
+        GLuint livesVAO, livesVBO;
+        glGenVertexArrays(1, &livesVAO);
+        glBindVertexArray(livesVAO);
+        glGenBuffers(1, &livesVBO);
+        glBindBuffer(GL_ARRAY_BUFFER, livesVBO);
+        glBufferData(GL_ARRAY_BUFFER, livesVerts.size() * sizeof(GLfloat), livesVerts.data(), GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
+        glDrawArrays(GL_TRIANGLES, 0, livesVerts.size() / 6);
+        glDeleteBuffers(1, &livesVBO); glDeleteVertexArrays(1, &livesVAO);
+
+        // --- AI Lives Display (Top-Right Corner) (NEW: green squares) ---
+        std::vector<GLfloat> aiLivesVerts;
+        float aiLivesStartX = 0.6f; // top-right area
+        float aiLivesStartY = 0.85f;
+        for (int i = 0; i < 3; i++) {
+            float xPos = aiLivesStartX + (i * lifeSpacing);
+            if (i < aiLives) {
+                // Full AI life (green square with darker border)
+                addQuad(aiLivesVerts, xPos - 0.003f, aiLivesStartY - 0.003f, xPos + lifeSquareSize + 0.003f, aiLivesStartY + lifeSquareSize + 0.003f, 0.0f, 0.35f, 0.0f); // Border (darker green)
+                addQuad(aiLivesVerts, xPos, aiLivesStartY, xPos + lifeSquareSize, aiLivesStartY + lifeSquareSize, 0.0f, 1.0f, 0.0f); // Green square
+            }
+            else {
+                // Lost AI life (gray/empty square with border)
+                addQuad(aiLivesVerts, xPos - 0.003f, aiLivesStartY - 0.003f, xPos + lifeSquareSize + 0.003f, aiLivesStartY + lifeSquareSize + 0.003f, 0.15f, 0.15f, 0.15f); // Border
+                addQuad(aiLivesVerts, xPos, aiLivesStartY, xPos + lifeSquareSize, aiLivesStartY + lifeSquareSize, 0.25f, 0.25f, 0.25f); // Gray square
+            }
+        }
+
+        if (!aiLivesVerts.empty()) {
+            GLuint aiLivesVAO, aiLivesVBO;
+            glGenVertexArrays(1, &aiLivesVAO);
+            glBindVertexArray(aiLivesVAO);
+            glGenBuffers(1, &aiLivesVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, aiLivesVBO);
+            glBufferData(GL_ARRAY_BUFFER, aiLivesVerts.size() * sizeof(GLfloat), aiLivesVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, aiLivesVerts.size() / 6);
+            glDeleteBuffers(1, &aiLivesVBO); glDeleteVertexArrays(1, &aiLivesVAO);
         }
 
         // --- Ammo Bar ---
@@ -509,6 +795,35 @@ int main(void) {
                 glDrawArrays(GL_TRIANGLES, 0, msgVerts.size() / 6);
                 glDeleteBuffers(1, &msgVBO); glDeleteVertexArrays(1, &msgVAO);
             }
+        }
+
+        // --- Game Over Message ---
+        if (gameOver) {
+            std::vector<GLfloat> gameOverVerts;
+            float msgWidth = 1.0f;
+            float msgHeight = 0.25f;
+            float msgX = -msgWidth / 2.0f;
+            float msgY = 0.2f;
+
+            // Game over box with border
+            addQuad(gameOverVerts, msgX - 0.02f, msgY - 0.02f, msgX + msgWidth + 0.02f, msgY + msgHeight + 0.02f, 0.0f, 0.0f, 0.0f);
+            addQuad(gameOverVerts, msgX, msgY, msgX + msgWidth, msgY + msgHeight, 0.2f, 0.0f, 0.0f);
+            addQuad(gameOverVerts, msgX + 0.01f, msgY + 0.01f, msgX + msgWidth - 0.01f, msgY + msgHeight - 0.01f, 0.4f, 0.0f, 0.0f);
+
+            // Draw "GAME OVER" text
+            drawText(gameOverVerts, msgX + 0.15f, msgY + 0.15f, "GAME OVER", 0.08f, 1.0f, 0.0f, 0.0f);
+            drawText(gameOverVerts, msgX + 0.22f, msgY + 0.05f, "YOU LOST", 0.06f, 1.0f, 1.0f, 1.0f);
+
+            GLuint gameOverVAO, gameOverVBO;
+            glGenVertexArrays(1, &gameOverVAO);
+            glBindVertexArray(gameOverVAO);
+            glGenBuffers(1, &gameOverVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, gameOverVBO);
+            glBufferData(GL_ARRAY_BUFFER, gameOverVerts.size() * sizeof(GLfloat), gameOverVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, gameOverVerts.size() / 6);
+            glDeleteBuffers(1, &gameOverVBO); glDeleteVertexArrays(1, &gameOverVAO);
         }
 
         glfwSwapBuffers(window);
