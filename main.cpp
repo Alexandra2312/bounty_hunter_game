@@ -286,14 +286,52 @@ int main(void) {
     std::vector<GLfloat> sceneVerts;
     addQuad(sceneVerts, -1.0f, -0.5f, 1.0f, -1.0f, 0.83f, 0.72f, 0.49f); // ground
     // mountains
+ // mountains (trapezoids — replace the previous triangular mountain block)
+{
+    // choose mountain colors (rusty red variants)
+    float m1r = 0.62f, m1g = 0.18f, m1b = 0.08f; // deep canyon
+    float m2r = 0.57f, m2g = 0.26f, m2b = 0.14f; // warm rust
+    float m3r = 0.72f, m3g = 0.32f, m3b = 0.12f; // bright ridge
+
+    // trapezoid 1 (left) - bottom wide, top narrower
+    // bottom-left, bottom-right, top-right  (triangle 1)
     sceneVerts.insert(sceneVerts.end(), {
-     -0.9f,-0.5f,0.0f, 0.57f,0.26f,0.14f,
-     -0.5f, 0.4f,0.0f, 0.57f,0.26f,0.14f,
-     -0.1f,-0.5f,0.0f, 0.57f,0.26f,0.14f,
-      0.2f,-0.5f,0.0f, 0.62f,0.18f,0.08f, // slightly darker on this peak
-      0.6f, 0.5f,0.0f, 0.72f,0.32f,0.12f, // a brighter ridge
-      1.0f,-0.5f,0.0f, 0.62f,0.18f,0.08f
-     });
+        -0.95f, -0.5f, 0.0f,  m1r, m1g, m1b,
+        -0.45f, -0.5f, 0.0f,  m1r, m1g, m1b,
+        -0.6f,  0.15f, 0.0f,  m1r, m1g, m1b
+    });
+    // bottom-left, top-right, top-left (triangle 2)
+    sceneVerts.insert(sceneVerts.end(), {
+        -0.95f, -0.5f, 0.0f,  m1r, m1g, m1b,
+        -0.6f,  0.15f, 0.0f,  m1r, m1g, m1b,
+        -0.8f,  0.10f, 0.0f,  m1r, m1g, m1b
+    });
+
+    // trapezoid 2 (center) - slightly taller, different top width
+    sceneVerts.insert(sceneVerts.end(), {
+        -0.55f, -0.5f, 0.0f,  m2r, m2g, m2b,
+         0.05f, -0.5f, 0.0f,  m2r, m2g, m2b,
+        -0.1f,  0.4f,  0.0f,  m2r, m2g, m2b
+    });
+    sceneVerts.insert(sceneVerts.end(), {
+        -0.55f, -0.5f, 0.0f,  m2r, m2g, m2b,
+        -0.1f,  0.4f,  0.0f,  m2r, m2g, m2b,
+        -0.3f,  0.35f, 0.0f,  m2r, m2g, m2b
+    });
+
+    // trapezoid 3 (right) - wide base, medium top
+    sceneVerts.insert(sceneVerts.end(), {
+         0.15f, -0.5f, 0.0f,  m3r, m3g, m3b,
+         0.95f, -0.5f, 0.0f,  m3r, m3g, m3b,
+         0.5f,  0.45f, 0.0f,  m3r, m3g, m3b
+    });
+    sceneVerts.insert(sceneVerts.end(), {
+         0.15f, -0.5f, 0.0f,  m3r, m3g, m3b,
+         0.5f,  0.45f, 0.0f,  m3r, m3g, m3b,
+         0.35f, 0.35f, 0.0f,  m3r, m3g, m3b
+    });
+}
+
     // cacti
     addQuad(sceneVerts, -0.75f, -0.5f, -0.7f, -0.1f, 0.0f, 0.8f, 0.0f);
     addQuad(sceneVerts, 0.6f, -0.5f, 0.65f, -0.15f, 0.0f, 0.9f, 0.0f);
