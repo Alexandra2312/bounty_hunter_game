@@ -59,6 +59,11 @@ bool muzzleFlashActive = false;
 double muzzleFlashStartTime = 0.0;
 const double MUZZLE_FLASH_DURATION = 0.15; // Flash for 0.15 seconds (a few frames)
 
+float jumpY = 0.0f;
+
+// --- Pause button ---
+bool isPaused = false;
+
 // --- Second Cowboy (AI) ---
 struct AICowboy {
     float x, y;
@@ -287,50 +292,50 @@ int main(void) {
     addQuad(sceneVerts, -1.0f, -0.5f, 1.0f, -1.0f, 0.83f, 0.72f, 0.49f); // ground
     // mountains
  // mountains (trapezoids — replace the previous triangular mountain block)
-{
-    // choose mountain colors (rusty red variants)
-    float m1r = 0.62f, m1g = 0.18f, m1b = 0.08f; // deep canyon
-    float m2r = 0.57f, m2g = 0.26f, m2b = 0.14f; // warm rust
-    float m3r = 0.72f, m3g = 0.32f, m3b = 0.12f; // bright ridge
+    {
+        // choose mountain colors (rusty red variants)
+        float m1r = 0.62f, m1g = 0.18f, m1b = 0.08f; // deep canyon
+        float m2r = 0.57f, m2g = 0.26f, m2b = 0.14f; // warm rust
+        float m3r = 0.72f, m3g = 0.32f, m3b = 0.12f; // bright ridge
 
-    // trapezoid 1 (left) - bottom wide, top narrower
-    // bottom-left, bottom-right, top-right  (triangle 1)
-    sceneVerts.insert(sceneVerts.end(), {
-        -0.95f, -0.5f, 0.0f,  m1r, m1g, m1b,
-        -0.45f, -0.5f, 0.0f,  m1r, m1g, m1b,
-        -0.6f,  0.15f, 0.0f,  m1r, m1g, m1b
-    });
-    // bottom-left, top-right, top-left (triangle 2)
-    sceneVerts.insert(sceneVerts.end(), {
-        -0.95f, -0.5f, 0.0f,  m1r, m1g, m1b,
-        -0.6f,  0.15f, 0.0f,  m1r, m1g, m1b,
-        -0.8f,  0.10f, 0.0f,  m1r, m1g, m1b
-    });
+        // trapezoid 1 (left) - bottom wide, top narrower
+        // bottom-left, bottom-right, top-right  (triangle 1)
+        sceneVerts.insert(sceneVerts.end(), {
+            -0.95f, -0.5f, 0.0f,  m1r, m1g, m1b,
+            -0.45f, -0.5f, 0.0f,  m1r, m1g, m1b,
+            -0.6f,  0.15f, 0.0f,  m1r, m1g, m1b
+            });
+        // bottom-left, top-right, top-left (triangle 2)
+        sceneVerts.insert(sceneVerts.end(), {
+            -0.95f, -0.5f, 0.0f,  m1r, m1g, m1b,
+            -0.6f,  0.15f, 0.0f,  m1r, m1g, m1b,
+            -0.8f,  0.10f, 0.0f,  m1r, m1g, m1b
+            });
 
-    // trapezoid 2 (center) - slightly taller, different top width
-    sceneVerts.insert(sceneVerts.end(), {
-        -0.55f, -0.5f, 0.0f,  m2r, m2g, m2b,
-         0.05f, -0.5f, 0.0f,  m2r, m2g, m2b,
-        -0.1f,  0.4f,  0.0f,  m2r, m2g, m2b
-    });
-    sceneVerts.insert(sceneVerts.end(), {
-        -0.55f, -0.5f, 0.0f,  m2r, m2g, m2b,
-        -0.1f,  0.4f,  0.0f,  m2r, m2g, m2b,
-        -0.3f,  0.35f, 0.0f,  m2r, m2g, m2b
-    });
+        // trapezoid 2 (center) - slightly taller, different top width
+        sceneVerts.insert(sceneVerts.end(), {
+            -0.55f, -0.5f, 0.0f,  m2r, m2g, m2b,
+             0.05f, -0.5f, 0.0f,  m2r, m2g, m2b,
+            -0.1f,  0.4f,  0.0f,  m2r, m2g, m2b
+            });
+        sceneVerts.insert(sceneVerts.end(), {
+            -0.55f, -0.5f, 0.0f,  m2r, m2g, m2b,
+            -0.1f,  0.4f,  0.0f,  m2r, m2g, m2b,
+            -0.3f,  0.35f, 0.0f,  m2r, m2g, m2b
+            });
 
-    // trapezoid 3 (right) - wide base, medium top
-    sceneVerts.insert(sceneVerts.end(), {
-         0.15f, -0.5f, 0.0f,  m3r, m3g, m3b,
-         0.95f, -0.5f, 0.0f,  m3r, m3g, m3b,
-         0.5f,  0.45f, 0.0f,  m3r, m3g, m3b
-    });
-    sceneVerts.insert(sceneVerts.end(), {
-         0.15f, -0.5f, 0.0f,  m3r, m3g, m3b,
-         0.5f,  0.45f, 0.0f,  m3r, m3g, m3b,
-         0.35f, 0.35f, 0.0f,  m3r, m3g, m3b
-    });
-}
+        // trapezoid 3 (right) - wide base, medium top
+        sceneVerts.insert(sceneVerts.end(), {
+             0.15f, -0.5f, 0.0f,  m3r, m3g, m3b,
+             0.95f, -0.5f, 0.0f,  m3r, m3g, m3b,
+             0.5f,  0.45f, 0.0f,  m3r, m3g, m3b
+            });
+        sceneVerts.insert(sceneVerts.end(), {
+             0.15f, -0.5f, 0.0f,  m3r, m3g, m3b,
+             0.5f,  0.45f, 0.0f,  m3r, m3g, m3b,
+             0.35f, 0.35f, 0.0f,  m3r, m3g, m3b
+            });
+    }
 
     // cacti
     addQuad(sceneVerts, -0.75f, -0.5f, -0.7f, -0.1f, 0.0f, 0.8f, 0.0f);
@@ -412,197 +417,220 @@ int main(void) {
         tumbleweed.angle += tumbleweed.rotationSpeed * deltaTime;
         if (tumbleweed.x - tumbleweed.radius > 1.2f) tumbleweed.x = -1.2f;
 
-        // === AI Cowboy Movement ===
-        if (!aiDead) {
-            aiCowboy.x += aiCowboy.direction * aiCowboy.speed * deltaTime;
-            // Change direction when reaching boundaries
-            if (aiCowboy.x >= aiCowboy.maxX) {
-                aiCowboy.x = aiCowboy.maxX;
-                aiCowboy.direction = -1.0f;
-            }
-            else if (aiCowboy.x <= aiCowboy.minX) {
-                aiCowboy.x = aiCowboy.minX;
-                aiCowboy.direction = 1.0f;
-            }
+        static bool pauseHeld = false;
+        int pauseKeyState = glfwGetKey(window, GLFW_KEY_P);
+        if (pauseKeyState == GLFW_PRESS && !pauseHeld) {
+            isPaused = !isPaused;
+            pauseHeld = true;
+        }
+        if (pauseKeyState == GLFW_RELEASE) {
+            pauseHeld = false;
         }
 
-        // === AI Death Animation update (if active) ===
-        if (aiFalling) {
-            double t = currentTime - aiDeathStartTime;
-            float progress = (float)std::min(t / AI_FALL_DURATION, 1.0);
-            aiFallRotation = progress * 90.0f;            // rotate up to 90 degrees
-            aiFallY = progress * -0.25f;                 // sink down up to -0.25
-            if (t >= AI_FALL_DURATION) {
-                // animation finished -> mark fully gone
-                aiFalling = false;
-                aiGone = true;
+        if (!isPaused) {
+            // === AI Cowboy Movement ===
+            if (!aiDead) {
+                aiCowboy.x += aiCowboy.direction * aiCowboy.speed * deltaTime;
+                // Change direction when reaching boundaries
+                if (aiCowboy.x >= aiCowboy.maxX) {
+                    aiCowboy.x = aiCowboy.maxX;
+                    aiCowboy.direction = -1.0f;
+                }
+                else if (aiCowboy.x <= aiCowboy.minX) {
+                    aiCowboy.x = aiCowboy.minX;
+                    aiCowboy.direction = 1.0f;
+                }
             }
-        }
 
-        // === Movement: WASD and Arrow keys (disabled when game over) ===
-        if (!gameOver) {
-            // Player facing updates: pressing A makes him face left; D makes him face right.
-            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
-                playerFacingRight = false; // flip to left when pressing A
-                cowboyX -= 0.4f * deltaTime;
+            // === AI Death Animation update (if active) ===
+            if (aiFalling) {
+                double t = currentTime - aiDeathStartTime;
+                float progress = (float)std::min(t / AI_FALL_DURATION, 1.0);
+                aiFallRotation = progress * 90.0f;            // rotate up to 90 degrees
+                aiFallY = progress * -0.25f;                 // sink down up to -0.25
+                if (t >= AI_FALL_DURATION) {
+                    // animation finished -> mark fully gone
+                    aiFalling = false;
+                    aiGone = true;
+                }
             }
-            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-                playerFacingRight = true; // face right when pressing D
-                cowboyX += 0.4f * deltaTime;
+
+            // === Movement: WASD and Arrow keys (disabled when game over) ===
+            if (!gameOver) {
+                // Player facing updates: pressing A makes him face left; D makes him face right.
+                if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+                    playerFacingRight = false; // flip to left when pressing A
+                    cowboyX -= 0.4f * deltaTime;
+                }
+                if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+                    playerFacingRight = true; // face right when pressing D
+                    cowboyX += 0.4f * deltaTime;
+                }
+                if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+                    cowboyY += 0.4f * deltaTime;
+                if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+                    cowboyY -= 0.4f * deltaTime;
+
+                // === Jumping ===
+                if (!isJumping && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                    isJumping = true;
+                    jumpStartTime = currentTime;
+                }
             }
-            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
-                cowboyY += 0.4f * deltaTime;
-            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
-                cowboyY -= 0.4f * deltaTime;
-
-            // === Jumping ===
-            if (!isJumping && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-                isJumping = true;
-                jumpStartTime = currentTime;
+            
+            if (isJumping) {
+                float t = (float)(currentTime - jumpStartTime);
+                if (t < 1.0f)
+                    jumpY = 0.25f * sin(t * M_PI);
+                else
+                    isJumping = false;
             }
-        }
-        float jumpY = 0.0f;
-        if (isJumping) {
-            float t = (float)(currentTime - jumpStartTime);
-            if (t < 1.0f)
-                jumpY = 0.25f * sin(t * M_PI);
-            else
-                isJumping = false;
-        }
 
-        // Player’s torso anchor matches drawCowboy()
-        float playerBaseX = cowboyX;
-        float playerBaseY = cowboyY + jumpY - 0.2f;
-
-        // Treat the saloon as a rectangle with a small buffer for easy triggering
-        bool nearSaloon =
-            playerBaseX >= saloonLeft - 0.1f && playerBaseX <= saloonRight + 0.1f &&
-            playerBaseY >= saloonBottom - 0.05f && playerBaseY <= saloonTop + 0.05f;
-
-        static bool reloadHeld = false;  // prevents holding R from spamming reloads
-        int reloadKeyState = glfwGetKey(window, GLFW_KEY_R);
-
-        if (!gameOver && nearSaloon && reloadKeyState == GLFW_PRESS && !reloadHeld) {
-            bulletCount = 8;
-            showAmmoBar = true;
-            ammoBarShowTime = currentTime;
-            reloadHeld = true;
-        }
-        if (reloadKeyState == GLFW_RELEASE) {
-            reloadHeld = false;
-        }
-
-        // Update bullets
-        for (auto& b : bullets) b.x += b.speed * deltaTime;
-
-        // === Collision Detection: AI Bullets vs Player Cowboy Body ===
-        if (!gameOver && playerLives > 0) {
+            // Player’s torso anchor matches drawCowboy()
             float playerBaseX = cowboyX;
             float playerBaseY = cowboyY + jumpY - 0.2f;
-            // Player cowboy body bounds (from drawCowboy function)
-            float playerBodyLeft = playerBaseX - 0.04f;
-            float playerBodyRight = playerBaseX + 0.04f;
-            float playerBodyBottom = playerBaseY + 0.1f;
-            float playerBodyTop = playerBaseY + 0.22f;
 
-            // Check collision with AI bullets
-            bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
-                [&](const Bullet& b) {
-                    if (b.isAIBullet) {
-                        // Bullet bounds
-                        float bulletLeft = b.x;
-                        float bulletRight = b.x + 0.02f * (b.speed >= 0 ? 1.0f : -1.0f);
-                        // normalize min/max
-                        if (bulletRight < bulletLeft) std::swap(bulletLeft, bulletRight);
-                        float bulletBottom = b.y;
-                        float bulletTop = b.y + 0.01f;
+            // Treat the saloon as a rectangle with a small buffer for easy triggering
+            bool nearSaloon =
+                playerBaseX >= saloonLeft - 0.1f && playerBaseX <= saloonRight + 0.1f &&
+                playerBaseY >= saloonBottom - 0.05f && playerBaseY <= saloonTop + 0.05f;
 
-                        // Check if bullet overlaps with player body
-                        if (bulletRight >= playerBodyLeft && bulletLeft <= playerBodyRight &&
-                            bulletTop >= playerBodyBottom && bulletBottom <= playerBodyTop) {
-                            // Collision! Player loses a life
-                            playerLives--;
-                            if (playerLives <= 0) {
-                                gameOver = true;
+            static bool reloadHeld = false;  // prevents holding R from spamming reloads
+            int reloadKeyState = glfwGetKey(window, GLFW_KEY_R);
+
+            if (!gameOver && nearSaloon && reloadKeyState == GLFW_PRESS && !reloadHeld) {
+                bulletCount = 8;
+                showAmmoBar = true;
+                ammoBarShowTime = currentTime;
+                reloadHeld = true;
+            }
+            if (reloadKeyState == GLFW_RELEASE) {
+                reloadHeld = false;
+            }
+
+            static bool pauseHeld = false;
+            int pauseKeyState = glfwGetKey(window, GLFW_KEY_P);
+
+            if (pauseKeyState == GLFW_PRESS && !pauseHeld) {
+                isPaused = !isPaused;
+                pauseHeld = true;
+            }
+            if (pauseKeyState == GLFW_RELEASE) {
+                pauseHeld = false;
+            }
+
+            // Update bullets
+            for (auto& b : bullets) b.x += b.speed * deltaTime;
+
+            // === Collision Detection: AI Bullets vs Player Cowboy Body ===
+            if (!gameOver && playerLives > 0) {
+                float playerBaseX = cowboyX;
+                float playerBaseY = cowboyY + jumpY - 0.2f;
+                // Player cowboy body bounds (from drawCowboy function)
+                float playerBodyLeft = playerBaseX - 0.04f;
+                float playerBodyRight = playerBaseX + 0.04f;
+                float playerBodyBottom = playerBaseY + 0.1f;
+                float playerBodyTop = playerBaseY + 0.22f;
+
+                // Check collision with AI bullets
+                bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+                    [&](const Bullet& b) {
+                        if (b.isAIBullet) {
+                            // Bullet bounds
+                            float bulletLeft = b.x;
+                            float bulletRight = b.x + 0.02f * (b.speed >= 0 ? 1.0f : -1.0f);
+                            // normalize min/max
+                            if (bulletRight < bulletLeft) std::swap(bulletLeft, bulletRight);
+                            float bulletBottom = b.y;
+                            float bulletTop = b.y + 0.01f;
+
+                            // Check if bullet overlaps with player body
+                            if (bulletRight >= playerBodyLeft && bulletLeft <= playerBodyRight &&
+                                bulletTop >= playerBodyBottom && bulletBottom <= playerBodyTop) {
+                                // Collision! Player loses a life
+                                playerLives--;
+                                if (playerLives <= 0) {
+                                    gameOver = true;
+                                }
+                                return true; // Remove bullet
                             }
-                            return true; // Remove bullet
                         }
-                    }
-                    return false;
-                }), bullets.end());
-        }
+                        return false;
+                    }), bullets.end());
+            }
 
-        // === Collision Detection: Player Bullets vs AI Cowboy Body (NEW) ===
-        // Only process collisions if AI is not already gone/fully dead
-        if (!aiGone && !aiDead) {
-            float aiBaseX = aiCowboy.x;
-            float aiBaseY = aiCowboy.y;
-            // AI cowboy body bounds (same as drawCowboy)
-            float aiBodyLeft = aiBaseX - 0.04f;
-            float aiBodyRight = aiBaseX + 0.04f;
-            float aiBodyBottom = aiBaseY + 0.1f;
-            float aiBodyTop = aiBaseY + 0.22f;
+            // === Collision Detection: Player Bullets vs AI Cowboy Body (NEW) ===
+            // Only process collisions if AI is not already gone/fully dead
+            if (!aiGone && !aiDead) {
+                float aiBaseX = aiCowboy.x;
+                float aiBaseY = aiCowboy.y;
+                // AI cowboy body bounds (same as drawCowboy)
+                float aiBodyLeft = aiBaseX - 0.04f;
+                float aiBodyRight = aiBaseX + 0.04f;
+                float aiBodyBottom = aiBaseY + 0.1f;
+                float aiBodyTop = aiBaseY + 0.22f;
 
-            bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
-                [&](const Bullet& b) {
-                    if (!b.isAIBullet) {
-                        // Player bullet bounds
-                        float bulletLeft = b.x;
-                        float bulletRight = b.x + 0.02f * (b.speed >= 0 ? 1.0f : -1.0f);
-                        if (bulletRight < bulletLeft) std::swap(bulletLeft, bulletRight);
-                        float bulletBottom = b.y;
-                        float bulletTop = b.y + 0.01f;
+                bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+                    [&](const Bullet& b) {
+                        if (!b.isAIBullet) {
+                            // Player bullet bounds
+                            float bulletLeft = b.x;
+                            float bulletRight = b.x + 0.02f * (b.speed >= 0 ? 1.0f : -1.0f);
+                            if (bulletRight < bulletLeft) std::swap(bulletLeft, bulletRight);
+                            float bulletBottom = b.y;
+                            float bulletTop = b.y + 0.01f;
 
-                        // Check overlap with AI body
-                        if (bulletRight >= aiBodyLeft && bulletLeft <= aiBodyRight &&
-                            bulletTop >= aiBodyBottom && bulletBottom <= aiBodyTop) {
-                            // Collision! AI loses a life
-                            aiLives--;
-                            if (aiLives <= 0) {
-                                // trigger death/fall animation (do not immediately remove)
-                                aiDead = true; // stop movement/shooting immediately
-                                aiFalling = true;
-                                aiDeathStartTime = currentTime;
-                                aiCowboy.muzzleFlashActive = false;
+                            // Check overlap with AI body
+                            if (bulletRight >= aiBodyLeft && bulletLeft <= aiBodyRight &&
+                                bulletTop >= aiBodyBottom && bulletBottom <= aiBodyTop) {
+                                // Collision! AI loses a life
+                                aiLives--;
+                                if (aiLives <= 0) {
+                                    // trigger death/fall animation (do not immediately remove)
+                                    aiDead = true; // stop movement/shooting immediately
+                                    aiFalling = true;
+                                    aiDeathStartTime = currentTime;
+                                    aiCowboy.muzzleFlashActive = false;
+                                }
+                                return true; // remove bullet
                             }
-                            return true; // remove bullet
                         }
-                    }
-                    return false;
-                }), bullets.end());
-        }
+                        return false;
+                    }), bullets.end());
+            }
 
-        // Remove bullets that go off screen (left or right)
-        bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
-            [](const Bullet& b) {return b.x > 1.2f || b.x < -1.2f; }), bullets.end());
+            // Remove bullets that go off screen (left or right)
+            bullets.erase(std::remove_if(bullets.begin(), bullets.end(),
+                [](const Bullet& b) {return b.x > 1.2f || b.x < -1.2f; }), bullets.end());
 
-        // === AI Cowboy Shooting (disabled when game over or AI dead) ===
-        if (!gameOver && !aiDead && currentTime - aiCowboy.lastShotTime >= AI_SHOOT_INTERVAL) {
-            // AI cowboy shoots (from gun barrel position)
-            bool aiFacingRight = (aiCowboy.direction > 0.0f);
-            float aiGunX = aiCowboy.x + (aiFacingRight ? 0.11f : -0.11f); // Gun barrel X position depending on facing
-            float aiGunY = aiCowboy.y + 0.15f; // Bullet Y position (matches player's relative offset)
-            float aiBulletSpeed = (aiFacingRight ? 0.8f : -0.8f);
-            bullets.push_back({ aiGunX, aiGunY, aiBulletSpeed, true }); // true = AI bullet
-            aiCowboy.lastShotTime = currentTime;
-            // Activate AI muzzle flash
-            aiCowboy.muzzleFlashActive = true;
-            aiCowboy.muzzleFlashStartTime = currentTime;
-        }
+            // === AI Cowboy Shooting (disabled when game over or AI dead) ===
+            if (!gameOver && !aiDead && currentTime - aiCowboy.lastShotTime >= AI_SHOOT_INTERVAL) {
+                // AI cowboy shoots (from gun barrel position)
+                bool aiFacingRight = (aiCowboy.direction > 0.0f);
+                float aiGunX = aiCowboy.x + (aiFacingRight ? 0.11f : -0.11f); // Gun barrel X position depending on facing
+                float aiGunY = aiCowboy.y + 0.15f; // Bullet Y position (matches player's relative offset)
+                float aiBulletSpeed = (aiFacingRight ? 0.8f : -0.8f);
+                bullets.push_back({ aiGunX, aiGunY, aiBulletSpeed, true }); // true = AI bullet
+                aiCowboy.lastShotTime = currentTime;
+                // Activate AI muzzle flash
+                aiCowboy.muzzleFlashActive = true;
+                aiCowboy.muzzleFlashStartTime = currentTime;
+            }
 
-        // Update AI muzzle flash state
-        if (aiCowboy.muzzleFlashActive && (currentTime - aiCowboy.muzzleFlashStartTime) > MUZZLE_FLASH_DURATION) {
-            aiCowboy.muzzleFlashActive = false;
-        }
+            // Update AI muzzle flash state
+            if (aiCowboy.muzzleFlashActive && (currentTime - aiCowboy.muzzleFlashStartTime) > MUZZLE_FLASH_DURATION) {
+                aiCowboy.muzzleFlashActive = false;
+            }
 
-        // Hide ammo bar after duration
-        if (showAmmoBar && (currentTime - ammoBarShowTime) > AMMO_BAR_DURATION) {
-            showAmmoBar = false;
-        }
+            // Hide ammo bar after duration
+            if (showAmmoBar && (currentTime - ammoBarShowTime) > AMMO_BAR_DURATION) {
+                showAmmoBar = false;
+            }
 
-        // Update muzzle flash state
-        if (muzzleFlashActive && (currentTime - muzzleFlashStartTime) > MUZZLE_FLASH_DURATION) {
-            muzzleFlashActive = false;
+            // Update muzzle flash state
+            if (muzzleFlashActive && (currentTime - muzzleFlashStartTime) > MUZZLE_FLASH_DURATION) {
+                muzzleFlashActive = false;
+            }
         }
 
         // --- Background ---
@@ -1052,12 +1080,35 @@ int main(void) {
             glDeleteBuffers(1, &gameOverVBO); glDeleteVertexArrays(1, &gameOverVAO);
         }
 
-        
+        if (isPaused) {
+            std::vector<GLfloat> pauseVerts;
+            addQuad(pauseVerts, -0.13f, 0.02f, 0.13f, 0.14f, 0.0f, 0.0f, 0.0f);
+            drawText(pauseVerts, -0.11f, 0.05f, "PAUSED", 0.05f, 1.0f, 1.0f, 1.0f);
+
+            GLuint pauseVAO, pauseVBO;
+            glGenVertexArrays(1, &pauseVAO);
+            glBindVertexArray(pauseVAO);
+            glGenBuffers(1, &pauseVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, pauseVBO);
+            glBufferData(GL_ARRAY_BUFFER, pauseVerts.size() * sizeof(GLfloat),
+                pauseVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                6 * sizeof(GLfloat), (void*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+                6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+            glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, pauseVerts.size() / 6);
+            glDeleteBuffers(1, &pauseVBO);
+            glDeleteVertexArrays(1, &pauseVAO);
+        }
+
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    
+
 
     glDeleteBuffers(1, &VBO);
     glDeleteVertexArrays(1, &VAO);
