@@ -31,11 +31,11 @@ A small OpenGL cowboy duel built with GLFW, GLEW and custom shaders. Ride your h
 - Keep shader files (`SimpleVertexShader.vertexshader`, `SimpleFragmentShader.fragmentshader`) alongside the executable.
 
 ## Repository Layout
-main.cpp // Game loop & rendering
-shader.[ch]pp // Shader helpers
-SimpleVertexShader.vertexshader
-SimpleFragmentShader.fragmentshader
-dependente/ // GLFW, GLEW, GLUT, GLM dependencies
-Debug/ // Built binary and required DLLs
+- main.cpp // Game loop & rendering
+- shader.[ch]pp // Shader helpers
+- SimpleVertexShader.vertexshader
+- SimpleFragmentShader.fragmentshader
+- dependente/ // GLFW, GLEW, GLUT, GLM dependencies
+- Debug/ // Built binary and required DLLs
 
 
