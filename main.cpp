@@ -45,6 +45,14 @@ bool gameOver = false;
 int aiLives = 3;
 bool aiDead = false;
 
+// --- AI Death Animation / Disappear ---
+bool aiFalling = false;
+float aiFallRotation = 0.0f;   // degrees
+float aiFallY = 0.0f;          // vertical sink offset
+double aiDeathStartTime = 0.0; // time when death animation started
+const float AI_FALL_DURATION = 2.0f; // seconds to complete fall and disappear
+bool aiGone = false; // when true, AI is removed from drawing entirely
+
 // --- Muzzle Flash ---
 bool muzzleFlashActive = false;
 double muzzleFlashStartTime = 0.0;
@@ -289,7 +297,7 @@ int main(void) {
     addQuad(sceneVerts, -0.75f, -0.5f, -0.7f, -0.1f, 0.0f, 0.8f, 0.0f);
     addQuad(sceneVerts, 0.6f, -0.5f, 0.65f, -0.15f, 0.0f, 0.9f, 0.0f);
 
-    // cacti
+    // cacti (duplicate in original - kept)
     addQuad(sceneVerts, -0.75f, -0.5f, -0.7f, -0.1f, 0.0f, 0.8f, 0.0f);
     addQuad(sceneVerts, 0.6f, -0.5f, 0.65f, -0.15f, 0.0f, 0.9f, 0.0f);
 
@@ -379,6 +387,19 @@ int main(void) {
             }
         }
 
+        // === AI Death Animation update (if active) ===
+        if (aiFalling) {
+            double t = currentTime - aiDeathStartTime;
+            float progress = (float)std::min(t / AI_FALL_DURATION, 1.0);
+            aiFallRotation = progress * 90.0f;            // rotate up to 90 degrees
+            aiFallY = progress * -0.25f;                 // sink down up to -0.25
+            if (t >= AI_FALL_DURATION) {
+                // animation finished -> mark fully gone
+                aiFalling = false;
+                aiGone = true;
+            }
+        }
+
         // === Movement: WASD and Arrow keys (disabled when game over) ===
         if (!gameOver) {
             // Player facing updates: pressing A makes him face left; D makes him face right.
@@ -451,7 +472,8 @@ int main(void) {
         }
 
         // === Collision Detection: Player Bullets vs AI Cowboy Body (NEW) ===
-        if (!aiDead) {
+        // Only process collisions if AI is not already gone/fully dead
+        if (!aiGone && !aiDead) {
             float aiBaseX = aiCowboy.x;
             float aiBaseY = aiCowboy.y;
             // AI cowboy body bounds (same as drawCowboy)
@@ -476,8 +498,10 @@ int main(void) {
                             // Collision! AI loses a life
                             aiLives--;
                             if (aiLives <= 0) {
-                                aiDead = true;
-                                // stop AI muzzle flash / shooting
+                                // trigger death/fall animation (do not immediately remove)
+                                aiDead = true; // stop movement/shooting immediately
+                                aiFalling = true;
+                                aiDeathStartTime = currentTime;
                                 aiCowboy.muzzleFlashActive = false;
                             }
                             return true; // remove bullet
@@ -643,30 +667,56 @@ int main(void) {
         }
 
         // --- AI Cowboy + Horse ---
-        std::vector<GLfloat> aiVerts;
-        float aiBaseX = aiCowboy.x;
-        float aiBaseY = aiCowboy.y;
-        bool aiFacingRight = (aiCowboy.direction > 0.0f);
-        drawCowboy(aiVerts, aiBaseX, aiBaseY, aiHatBob, aiFacingRight);
+        // draw only if not fully gone; if falling, animate rotation and sink; if aiDead but falling, still draw
+        if (!aiGone) {
+            std::vector<GLfloat> aiVerts;
+            float aiBaseX = aiCowboy.x;
+            float aiBaseY = aiCowboy.y + aiFallY; // vertical offset while falling
+            bool aiFacingRight = (aiCowboy.direction > 0.0f);
+            drawCowboy(aiVerts, aiBaseX, aiBaseY, aiHatBob, aiFacingRight);
 
-        GLuint aiVAO, aiVBO;
-        glGenVertexArrays(1, &aiVAO);
-        glBindVertexArray(aiVAO);
-        glGenBuffers(1, &aiVBO);
-        glBindBuffer(GL_ARRAY_BUFFER, aiVBO);
-        glBufferData(GL_ARRAY_BUFFER, aiVerts.size() * sizeof(GLfloat), aiVerts.data(), GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
-        glDrawArrays(GL_TRIANGLES, 0, aiVerts.size() / 6);
-        glDeleteBuffers(1, &aiVBO); glDeleteVertexArrays(1, &aiVAO);
+            // If falling, rotate vertices around pivot
+            if (aiFalling) {
+                // choose pivot near torso/head so it looks like tipping over
+                float cx = aiBaseX;                 // pivot x
+                float cy = aiBaseY + 0.12f;        // pivot y (around the upper body)
+                float angleRad = aiFallRotation * (float)M_PI / 180.0f;
+                float c = cos(angleRad), s = sin(angleRad);
+                for (size_t i = 0; i + 1 < aiVerts.size(); i += 6) {
+                    float x = aiVerts[i];
+                    float y = aiVerts[i + 1];
+                    float dx = x - cx;
+                    float dy = y - cy;
+                    float nx = cx + dx * c - dy * s;
+                    float ny = cy + dx * s + dy * c;
+                    aiVerts[i] = nx;
+                    aiVerts[i + 1] = ny;
+                }
+            }
+
+            GLuint aiVAO, aiVBO;
+            glGenVertexArrays(1, &aiVAO);
+            glBindVertexArray(aiVAO);
+            glGenBuffers(1, &aiVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, aiVBO);
+            glBufferData(GL_ARRAY_BUFFER, aiVerts.size() * sizeof(GLfloat), aiVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, aiVerts.size() / 6);
+            glDeleteBuffers(1, &aiVBO); glDeleteVertexArrays(1, &aiVAO);
+        }
 
         // --- AI Muzzle Flash ---
-        if (aiCowboy.muzzleFlashActive) {
+        // Only draw muzzle flash if AI not gone (and if currently active)
+        if (!aiGone && aiCowboy.muzzleFlashActive) {
             float flashElapsed = (float)(currentTime - aiCowboy.muzzleFlashStartTime);
             float flashAlpha = 1.0f - (flashElapsed / (float)MUZZLE_FLASH_DURATION); // Fade out
             flashAlpha = std::max(0.0f, std::min(1.0f, flashAlpha)); // Clamp between 0 and 1
 
             // AI gun barrel position depends on facing
+            float aiBaseX = aiCowboy.x;
+            float aiBaseY = aiCowboy.y + aiFallY;
+            bool aiFacingRight = (aiCowboy.direction > 0.0f);
             float aiGunBarrelX = aiBaseX + (aiFacingRight ? 0.11f : -0.11f);
             float aiGunBarrelY = aiBaseY + 0.16f; // Middle of gun vertically
 
@@ -676,19 +726,17 @@ int main(void) {
             float flashWidth = 0.08f * flashAlpha * (aiFacingRight ? 1.0f : -1.0f); // signed
             float flashBrightness = 1.0f * flashAlpha; // Brightness fades from full to zero
 
-            // Main flash (bright white-yellow)
             addQuad(aiFlashVerts,
                 aiGunBarrelX, aiGunBarrelY - flashHeight * 0.5f,
                 aiGunBarrelX + flashWidth, aiGunBarrelY + flashHeight * 0.5f,
                 flashBrightness, flashBrightness * 0.95f, flashBrightness * 0.4f); // Bright yellow-white
 
-            // Secondary inner flash (brighter core) - only visible in first half of flash duration
             if (flashAlpha > 0.5f) {
-                float coreAlpha = (flashAlpha - 0.5f) * 2.0f; // Scale from 0 to 1 over first half
+                float coreAlpha = (flashAlpha - 0.5f) * 2.0f;
                 addQuad(aiFlashVerts,
                     aiGunBarrelX, aiGunBarrelY - flashHeight * 0.3f * coreAlpha,
                     aiGunBarrelX + flashWidth * 0.7f * coreAlpha, aiGunBarrelY + flashHeight * 0.3f * coreAlpha,
-                    1.0f, 1.0f, 0.85f); // Very bright white-yellow core
+                    1.0f, 1.0f, 0.85f);
             }
 
             GLuint aiFlashVAO, aiFlashVBO;
