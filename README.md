@@ -1,3 +1,9 @@
+Gugulea Maria Alexandra   
+Matache Monica Magdalena  
+Tudorie Maria Alexia  
+Glavan Teodora Alexandra  
+Group 1232EEA  
+
 # Bounty Hunter Game 2D
 
 A small OpenGL cowboy duel built with GLFW, GLEW and custom shaders. Ride your horse, dodge bullets, and take down the rival gunslinger outside the desert saloon.
