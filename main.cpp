@@ -29,7 +29,7 @@ bool isNight = false;
 float cowboyX = 0.0f, cowboyY = 0.0f;
 bool isJumping = false;
 float jumpStartTime = 0.0f;
-bool playerFacingRight = true; // NEW: player's facing direction
+bool playerFacingRight = true; 
 
 // --- Gun/Ammo System ---
 int bulletCount = 8;
@@ -57,7 +57,7 @@ bool aiGone = false; // when true, AI is removed from drawing entirely
 // --- Muzzle Flash ---
 bool muzzleFlashActive = false;
 double muzzleFlashStartTime = 0.0;
-const double MUZZLE_FLASH_DURATION = 0.15; // Flash for 0.15 seconds (a few frames)
+const double MUZZLE_FLASH_DURATION = 0.15; 
 
 float jumpY = 0.0f;
 
@@ -75,7 +75,7 @@ struct AICowboy {
     double muzzleFlashStartTime;
 } aiCowboy = { -0.5f, -0.35f, 0.3f, 1.0f, -0.8f, 0.8f, 0.0, false, 0.0 };
 
-const double AI_SHOOT_INTERVAL = 3.0; // AI shoots every 3 seconds
+const double AI_SHOOT_INTERVAL = 3.0; 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
@@ -426,7 +426,97 @@ int main(void) {
         if (pauseKeyState == GLFW_RELEASE) {
             pauseHeld = false;
         }
+        // === Player Input & Actions (jumping, shooting) ===
+        if (!gameOver) {
+            // Movement: A/D for left/right, W/S for up/down if needed
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS)
+                cowboyY += 0.4f * deltaTime;
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS)
+                cowboyY -= 0.4f * deltaTime;
 
+            // Jumping: press SPACE to jump, returns immediately to ground after short hop
+            if (!isJumping && glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                isJumping = true;
+                jumpStartTime = currentTime;
+            }
+        }
+
+        if (isJumping) {
+            float t = (float)(currentTime - jumpStartTime);
+            if (t < 0.5f) // short jump duration
+                jumpY = 0.25f * sin(t * M_PI * 2.0f); // jump up and come down quickly
+            else {
+                jumpY = 0.0f;
+                isJumping = false;
+            }
+        }
+
+        // Shooting when near Saloon
+        float playerBaseX = cowboyX;
+        float playerBaseY = cowboyY + jumpY - 0.2f; // torso anchor
+
+        bool nearSaloon =
+            playerBaseX >= saloonLeft - 0.1f && playerBaseX <= saloonRight + 0.1f &&
+            playerBaseY >= saloonBottom - 0.05f && playerBaseY <= saloonTop + 0.05f;
+
+        static bool reloadHeld = false;
+        int reloadKeyState = glfwGetKey(window, GLFW_KEY_R);
+        if (!gameOver && nearSaloon && reloadKeyState == GLFW_PRESS && !reloadHeld) {
+            bulletCount = 8;
+            showAmmoBar = true;
+            ammoBarShowTime = currentTime;
+            reloadHeld = true;
+        }
+        if (reloadKeyState == GLFW_RELEASE) {
+            reloadHeld = false;
+        }
+
+        // If player has bullets, can shoot
+        if (!gameOver && bulletCount > 0) {
+            static bool shootHeld = false;
+            if (glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS && !shootHeld) { // F key to shoot
+                float gunBarrelX = cowboyX + (playerFacingRight ? 0.11f : -0.11f);
+                float gunBarrelY = cowboyY + jumpY - 0.2f + 0.16f;
+                float bulletSpeed = playerFacingRight ? 1.0f : -1.0f;
+                bullets.push_back({ gunBarrelX, gunBarrelY, bulletSpeed, false }); 
+                bulletCount--;
+                muzzleFlashActive = true;
+                muzzleFlashStartTime = currentTime;
+                shootHeld = true;
+            }
+            if (glfwGetKey(window, GLFW_KEY_F) == GLFW_RELEASE) {
+                shootHeld = false;
+            }
+        }
+
+        // === Display "No bullets left" message ===
+        if (bulletCount == 0 && !gameOver) {
+            std::vector<GLfloat> msgVerts;
+            float msgWidth = 0.8f;
+            float msgHeight = 0.15f;
+            float msgX = -msgWidth / 2.0f;
+            float msgY = 0.55f;
+
+            // Background with border
+            addQuad(msgVerts, msgX - 0.01f, msgY - 0.01f, msgX + msgWidth + 0.01f, msgY + msgHeight + 0.01f, 0.5f, 0.0f, 0.0f);
+            addQuad(msgVerts, msgX, msgY, msgX + msgWidth, msgY + msgHeight, 0.8f, 0.1f, 0.1f);
+
+            
+            drawText(msgVerts, msgX + 0.05f, msgY + 0.06f, "NO BULLETS LEFT", 0.05f, 1.0f, 1.0f, 1.0f);
+            drawText(msgVerts, msgX + 0.08f, msgY + 0.02f, "REFILL THE GUN", 0.04f, 1.0f, 0.9f, 0.0f);
+
+            GLuint msgVAO, msgVBO;
+            glGenVertexArrays(1, &msgVAO);
+            glBindVertexArray(msgVAO);
+            glGenBuffers(1, &msgVBO);
+            glBindBuffer(GL_ARRAY_BUFFER, msgVBO);
+            glBufferData(GL_ARRAY_BUFFER, msgVerts.size() * sizeof(GLfloat), msgVerts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0); glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat))); glEnableVertexAttribArray(1);
+            glDrawArrays(GL_TRIANGLES, 0, msgVerts.size() / 6);
+            glDeleteBuffers(1, &msgVBO);
+            glDeleteVertexArrays(1, &msgVAO);
+        }
         if (!isPaused) {
             // === AI Cowboy Movement ===
             if (!aiDead) {
@@ -442,7 +532,7 @@ int main(void) {
                 }
             }
 
-            // === AI Death Animation update (if active) ===
+            // === AI Death Animation  ===
             if (aiFalling) {
                 double t = currentTime - aiDeathStartTime;
                 float progress = (float)std::min(t / AI_FALL_DURATION, 1.0);
@@ -457,7 +547,7 @@ int main(void) {
 
             // === Movement: WASD and Arrow keys (disabled when game over) ===
             if (!gameOver) {
-                // Player facing updates: pressing A makes him face left; D makes him face right.
+                //  pressing A makes him face left; D makes him face right.
                 if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS) {
                     playerFacingRight = false; // flip to left when pressing A
                     cowboyX -= 0.4f * deltaTime;
@@ -477,7 +567,7 @@ int main(void) {
                     jumpStartTime = currentTime;
                 }
             }
-            
+
             if (isJumping) {
                 float t = (float)(currentTime - jumpStartTime);
                 if (t < 1.0f)
@@ -559,7 +649,7 @@ int main(void) {
                     }), bullets.end());
             }
 
-            // === Collision Detection: Player Bullets vs AI Cowboy Body (NEW) ===
+            // === Collision Detection: Player Bullets vs AI Cowboy Body ===
             // Only process collisions if AI is not already gone/fully dead
             if (!aiGone && !aiDead) {
                 float aiBaseX = aiCowboy.x;
@@ -870,7 +960,7 @@ int main(void) {
             if (i < playerLives) {
                 // Full life (red square with border)
                 addQuad(livesVerts, xPos - 0.003f, livesStartY - 0.003f, xPos + lifeSquareSize + 0.003f, livesStartY + lifeSquareSize + 0.003f, 0.2f, 0.0f, 0.0f); // Border
-                addQuad(livesVerts, xPos, livesStartY, xPos + lifeSquareSize, livesStartY + lifeSquareSize, 1.0f, 0.0f, 0.0f); // Red square
+                addQuad(livesVerts, xPos, livesStartY, xPos + lifeSquareSize, livesStartY + lifeSquareSize, 0.0f, 1.0f, 0.0f); // Red square
             }
             else {
                 // Lost life (gray/empty square with border)
@@ -890,7 +980,7 @@ int main(void) {
         glDrawArrays(GL_TRIANGLES, 0, livesVerts.size() / 6);
         glDeleteBuffers(1, &livesVBO); glDeleteVertexArrays(1, &livesVAO);
 
-        // --- AI Lives Display (Top-Right Corner) (green squares) ---
+        // --- AI Lives Display (Top-Right Corner) ---
         std::vector<GLfloat> aiLivesVerts;
         float aiLivesStartX = 0.6f; // top-right area
         float aiLivesStartY = 0.85f;
@@ -899,7 +989,7 @@ int main(void) {
             if (i < aiLives) {
                 // Full AI life (green square with darker border)
                 addQuad(aiLivesVerts, xPos - 0.003f, aiLivesStartY - 0.003f, xPos + lifeSquareSize + 0.003f, aiLivesStartY + lifeSquareSize + 0.003f, 0.0f, 0.35f, 0.0f); // Border (darker green)
-                addQuad(aiLivesVerts, xPos, aiLivesStartY, xPos + lifeSquareSize, aiLivesStartY + lifeSquareSize, 0.0f, 1.0f, 0.0f); // Green square
+                addQuad(aiLivesVerts, xPos, aiLivesStartY, xPos + lifeSquareSize, aiLivesStartY + lifeSquareSize, 1.0f, 0.0f, 0.0f); // Green square
             }
             else {
                 // Lost AI life (gray/empty square with border)
@@ -925,7 +1015,7 @@ int main(void) {
         if (showAmmoBar) {
             std::vector<GLfloat> ammoVerts;
 
-            // Professional horizontal bar background with border
+            //  horizontal bar background with border
             float barWidth = 0.6f;
             float barHeight = 0.12f;
             float barX = -barWidth / 2.0f;
@@ -1005,52 +1095,88 @@ int main(void) {
             }
         }
 
-        // --- Victory Message when AI is defeated ---
-
+        
+        // --- Victory Message when AI is defeated  ---
         if (aiDead) {
-            std::vector<GLfloat> victoryVerts;
-            float msgWidth = 1.0f;
-            float msgHeight = 0.25f;
-            float msgX = -msgWidth / 2.0f;
-            float msgY = 0.2f;
+            std::vector<GLfloat> verts;
 
-            // Game Won box with border (green theme)
-            addQuad(victoryVerts, msgX - 0.02f, msgY - 0.02f,
-                msgX + msgWidth + 0.02f, msgY + msgHeight + 0.0f,
-                0.0f, 0.2f, 0.0f); // dark green border
+            // --- Letter settings ---
+            float w = 0.04f;       // letter width
+            float h = 0.1f;        // letter height
+            float spacing = 0.02f; // spacing between letters
 
-            addQuad(victoryVerts, msgX, msgY,
-                msgX + msgWidth, msgY + msgHeight,
-                0.0f, 0.6f, 0.0f); // medium green background
+            // Centering horizontally
+            std::string line1 = "YOU";
+            std::string line2 = "WON";
+            float totalWidth1 = line1.size() * (w + spacing) - spacing;
+            float totalWidth2 = line2.size() * (w + spacing) - spacing;
+            float startX1 = -totalWidth1 / 2.0f;
+            float startX2 = -totalWidth2 / 2.0f;
 
-            addQuad(victoryVerts, msgX + 0.01f, msgY + 0.01f,
-                msgX + msgWidth - 0.01f, msgY + msgHeight - 0.01f,
-                0.0f, 0.8f, 0.0f); // brighter green inner glow
+            // Move letters up (sky)
+            float startY1 = 0.6f;
+            float startY2 = startY1 - 0.12f;
 
+            // --- Letter drawing functions (red) ---
+            auto addLetterY = [&](float x, float y) {
+                addQuad(verts, x, y + 0.05f, x + 0.01f, y + 0.1f, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + 0.03f, y + 0.05f, x + 0.04f, y + 0.1f, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + 0.02f, y, x + 0.03f, y + 0.05f, 0.0f, 1.0f, 0.0f);
+                };
 
-            // Draw "GAME WON" text
-            drawText(victoryVerts, msgX + 0.15f, msgY + 0.15f, "CONGRATULATIONS", 0.08f, 1.0f, 1.0f, 1.0f);
-            drawText(victoryVerts, msgX + 0.22f, msgY + 0.05f, "YOU WON", 0.06f, 1.0f, 1.0f, 0.6f);
+            auto addLetterO = [&](float x, float y) {
+                addQuad(verts, x, y, x + 0.01f, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + w - 0.01f, y, x + w, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x, y, x + w, y + 0.01f, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x, y + h - 0.01f, x + w, y + h, 0.0f, 1.0f, 0.0f);
+                };
 
+            auto addLetterU = [&](float x, float y) {
+                addQuad(verts, x, y + 0.01f, x + 0.01f, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + w - 0.01f, y + 0.01f, x + w, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x, y, x + w, y + 0.01f, 0.0f, 1.0f, 0.0f);
+                };
 
-            GLuint victoryVAO, victoryVBO;
-            glGenVertexArrays(1, &victoryVAO);
-            glBindVertexArray(victoryVAO);
-            glGenBuffers(1, &victoryVBO);
-            glBindBuffer(GL_ARRAY_BUFFER, victoryVBO);
-            glBufferData(GL_ARRAY_BUFFER, victoryVerts.size() * sizeof(GLfloat),
-                victoryVerts.data(), GL_DYNAMIC_DRAW);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
-                6 * sizeof(GLfloat), (void*)0);
+            auto addLetterW = [&](float x, float y) {
+                addQuad(verts, x, y, x + 0.01f, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + 0.03f, y, x + 0.04f, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + 0.01f, y, x + 0.02f, y + 0.05f, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + 0.02f, y, x + 0.03f, y + 0.05f, 0.0f, 1.0f, 0.0f);
+                };
+
+            auto addLetterN = [&](float x, float y) {
+                addQuad(verts, x, y, x + 0.01f, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + w - 0.01f, y, x + w, y + h, 0.0f, 1.0f, 0.0f);
+                addQuad(verts, x + 0.01f, y, x + 0.03f, y + h, 0.0f, 1.0f, 0.0f);
+                };
+
+            // --- Draw "YOU" ---
+            float x = startX1;
+            addLetterY(x, startY1); x += w + spacing;
+            addLetterO(x, startY1); x += w + spacing;
+            addLetterU(x, startY1); x += w + spacing;
+
+            // --- Draw "WON" ---
+            x = startX2;
+            addLetterW(x, startY2); x += w + spacing;
+            addLetterO(x, startY2); x += w + spacing;
+            addLetterN(x, startY2); x += w + spacing;
+
+            // --- VAO/VBO ---
+            GLuint vao, vbo;
+            glGenVertexArrays(1, &vao);
+            glBindVertexArray(vao);
+            glGenBuffers(1, &vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(GLfloat), verts.data(), GL_DYNAMIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
             glEnableVertexAttribArray(0);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
-                6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
             glEnableVertexAttribArray(1);
-            glDrawArrays(GL_TRIANGLES, 0, victoryVerts.size() / 6);
-            glDeleteBuffers(1, &victoryVBO);
-            glDeleteVertexArrays(1, &victoryVAO);
+            glDrawArrays(GL_TRIANGLES, 0, verts.size() / 6);
+            glDeleteBuffers(1, &vbo);
+            glDeleteVertexArrays(1, &vao);
         }
-
         // --- Game Over Message ---
         if (gameOver) {
             std::vector<GLfloat> gameOverVerts;
