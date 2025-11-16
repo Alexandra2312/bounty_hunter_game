@@ -7,7 +7,7 @@ uniform float uTime; // seconds from glfwGetTime()
 
 void main()
 {
-    // a soft periodic pulse (0.8 .. 1.2) — adjust speed by changing the multiplier
+    // a soft periodic pulse (0.8 .. 1.2) â€” adjust speed by changing the multiplier
     float pulse = 0.9 + 0.15 * sin(uTime * 2.0);
 
     // determine brightness of the incoming color (0..1)
@@ -20,7 +20,6 @@ void main()
     // final colour is a blend between original and pulsed color depending on mask
     vec3 finalCol = mix(fragColor, fragColor * pulse, mask);
 
-    // if you enable GL blending and want a slightly translucent moon, you could
-    // vary alpha here. For now keep fully opaque.
+    
     color = vec4(finalCol, 1.0);
 }
